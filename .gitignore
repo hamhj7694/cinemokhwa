@@ -1,0 +1,31 @@
+# --- local secrets ---
+.env
+.env.*
+*.local
+
+# --- python ---
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# --- node ---
+node_modules/
+dist/
+.vite/
+
+# --- heavy artifacts (never commit) ---
+models/
+work/
+output/
+*.mp4
+*.wav
+*.glb
+assets/bgm/*.mp3
+
+# --- os / editor ---
+Thumbs.db
+desktop.ini
+.DS_Store
+.idea/
+.vscode/
