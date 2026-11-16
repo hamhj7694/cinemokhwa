@@ -31,6 +31,7 @@
 | [`docs/DESIGN.md`](docs/DESIGN.md) | ✅ 완료 (D1~D54) | 단일 설계 기준서 — 결정 로그·파이프라인·데이터 구조·브랜딩 |
 | [`docs/PRD.md`](docs/PRD.md) | ✅ v0.2 | 제품 요구사항 — 대상·시나리오·기능(FR 23)·비기능(NFR)·수용 기준 |
 | [`docs/design/DESIGN-PLAN.md`](docs/design/DESIGN-PLAN.md) | ✅ 초안 완료 | Figma 비주얼/UI·UX 기획 — 화면·토큰·컴포넌트·플로우 |
+| [`docs/ENVIRONMENT.md`](docs/ENVIRONMENT.md) | ✅ P0 완료 | 설치 경로·모델 목록·실측 성능·설치 함정 |
 | [`docs/prompts/figma-uiux.md`](docs/prompts/figma-uiux.md) | ✅ v2 | Big Pickle + Figma MCP 실행 프롬프트 |
 | `docs/ARCHITECTURE.md` | ⏸ 대기 | 컴포넌트·인터페이스 상세 |
 | `docs/TASKS.md` | ⏸ 대기 | P0~P7 티켓 분해 + DoD |
