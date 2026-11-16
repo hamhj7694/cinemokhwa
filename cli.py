@@ -7,6 +7,7 @@
   mokhwa make --topic "..." --seconds 15 --plan     (예상 시간만)
   mokhwa make --run-id 20261116-101500             (이어서/재개)
   mokhwa make --run-id ... --scene 2 --force        (장면 1개만 다시)
+  mokhwa verify --run-id 20261116-101500            (품질 수치 측정)
   mokhwa batch --file plan.json
 
 종료 코드: 0 성공 / 3 설정 / 4 의존성 / 5 모델 / 6 ComfyUI / 7 LLM /
@@ -26,7 +27,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from engine import assemble, i2v, keyframe, script  # noqa: E402
+from engine import assemble, i2v, keyframe, script, verify  # noqa: E402
 from engine import project as project_mod  # noqa: E402
 from engine.comfy import Comfy  # noqa: E402
 from engine.config import Config  # noqa: E402
@@ -379,7 +380,53 @@ def cmd_make(args: argparse.Namespace) -> int:
     return 0
 
 
-def cmd_batch(args: argparse.Namespace) -> int:
+def cmd_verify(args: argparse.Namespace) -> int:
+    cfg = Config()
+    project = project_mod.load(cfg.work, args.run_id)
+    stored = project.data.get("params") or {}
+    for key in ("width", "height", "i2v_steps", "crossfade_seconds", "crf"):
+        if key in stored:
+            setattr(cfg, key, stored[key])
+
+    result = verify.run(cfg, project)
+    if args.json:
+        say(json.dumps(result, ensure_ascii=False, indent=2))
+        return 0 if result["overall"] != "FAIL" else 9
+
+    say(f"품질 측정 — {project.run_id} · 클립 {len(result['clips'])}개 · "
+        f"{result['sample_every']}프레임마다 표본")
+    say("")
+    say(f"{'scene':>5} {'frames':>6} {'YAVG':>7} {'YAVGsd':>7} {'YDIF':>7} "
+        f"{'ratio':>6} {'MAE':>6}  verdict")
+    say("-" * 60)
+    for row in result["clips"]:
+        ratio = "-" if row["ratio"] is None else f"{row['ratio']:.2f}"
+        mae = "-" if row["first_frame_mae"] is None else f"{row['first_frame_mae']:.2f}"
+        mark = {"PASS": "✓", "WARN": "!", "FAIL": "✗"}[row["verdict"]]
+        say(f"{row['scene']:>5} {row['frames']:>6} {row['yavg_mean']:>7.1f} "
+            f"{row['yavg_std']:>7.2f} {row['ydif_median']:>7.2f} {ratio:>6} "
+            f"{mae:>6}  {mark} {row['verdict']}"
+            + ("   (wide)" if row["wide_shot"] else ""))
+
+    notes = [(r["scene"], k, v) for r in result["clips"]
+             for k, v in r["verdicts"].items() if v != "PASS"]
+    if notes:
+        say("")
+        say("기준 미달 항목")
+        for scene_id, item, verdict in notes:
+            say(f"  장면 {scene_id:02d}  {item:<14} {verdict}")
+        say("")
+        say("  WARN = 장면 의도(원경·뒷모습·보케)로 설명 가능. 육안 확인.")
+        say("  FAIL = 결함 가능성. 해당 장면 재생성 권장:")
+        say(f"    .\\mokhwa.cmd make --run-id {project.run_id} --scene N --force")
+
+    say("")
+    say(f"저장: {result['_path']}")
+    say(f"종합: {result['overall']}")
+    return 0 if result["overall"] != "FAIL" else 9
+
+
+
     path = Path(args.file)
     if not path.exists():
         raise CineError("CFG-003", f"배치 파일이 없습니다: {path}")
@@ -438,6 +485,11 @@ def build_parser() -> argparse.ArgumentParser:
     p_make.add_argument("--scene", type=int, help="지정 장면만 재생성")
     p_make.add_argument("--plan", action="store_true", help="예상 시간만 출력")
     p_make.set_defaults(func=cmd_make)
+
+    p_verify = sub.add_parser("verify", help="품질 수치 측정(PRD 13.5)")
+    p_verify.add_argument("--run-id", required=True)
+    p_verify.add_argument("--json", action="store_true", help="JSON으로 출력")
+    p_verify.set_defaults(func=cmd_verify)
 
     p_batch = sub.add_parser("batch", help="여러 편 순차 생성")
     p_batch.add_argument("--file", required=True)
