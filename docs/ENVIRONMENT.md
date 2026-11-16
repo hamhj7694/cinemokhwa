@@ -1,6 +1,6 @@
 # ENVIRONMENT — 로컬 실행 환경 (P0)
 
-> 버전: v0.2 · 최초 작성: 2026-11-14 · 갱신: 2026-11-16
+> 버전: v0.3 · 최초 작성: 2026-11-14 · 갱신: 2026-11-16
 > 목적: 이 PC에 **무엇을, 어디에, 얼마나** 설치했고 **실측 성능이 얼마인지** 기록. 재설치·이전·문제해결의 유일한 기준.
 > 관련: `DESIGN.md` D48(설치 권한) · D55(설치 경로) · D56(I2V 확정) · D57(생성 기본값) · PRD FR-18(모델·환경 관리)
 
@@ -60,7 +60,9 @@ C:\Users\mbc\mokhwa\
 
 ---
 
-## 3. 모델 (총 25.3GB)
+## 3. 모델
+
+### 3.1 설치 완료 (25.3GB)
 
 | 파일 | 크기(byte) | 위치 (`ComfyUI/models/`) | 출처 |
 |---|---|---|---|
@@ -71,6 +73,25 @@ C:\Users\mbc\mokhwa\
 | `RealESRGAN_x4.pth` | 67,040,989 | `upscale_models\` | `ai-forever/Real-ESRGAN` |
 
 **미설치(2차)**: 애니 체크포인트(Animagine XL 계열), IPAdapter, LoRA. `D49` 카탈로그 확장 시 추가.
+
+### 3.2 렌더 모드 확장용 — **전부 미설치** (D59~D61)
+
+| 모드 | 도구 / 모델 | 크기 | 상태 | 라이선스 | VRAM |
+|---|---|---|---|---|---|
+| **M-A** | (설치 완료 — §3.1) | — | ✅ | Apache-2.0 / OpenRAIL++ / BSD-3 | 9–11.5GB |
+| **M-B** | Animagine XL 4.0 (애니 SDXL) | ~6.9GB | ❌ | **확인 필요**(Q9) | ~7GB |
+| **M-B** | SAM2 `hiera_large` | ~0.9GB | ❌ | Apache-2.0 | ~2GB |
+| **M-B** | SDXL 인페인팅 (가린 영역 복원) | ~6.9GB | ❌ | 확인 필요 | ~7GB |
+| **M-B·M-C** | Blender 4.2 LTS 포터블 + Rigify | ~0.4GB | ❌ | GPL-2.0+ (도구) | 3–6GB |
+| **M-C** | TRELLIS.2-4B (이미지→3D) | ~8GB+ | ❌ | 확인 필요(Q9) | **10GB+ (위험)** |
+| **M-C** | Hunyuan3D-2.1 (보조) | ~7GB | ❌ | 확인 필요(Q9) | ~8GB |
+| **M-C** | CC0 에셋팩 (Poly Haven·Quaternius) | ~2–5GB | ❌ | CC0 | — |
+| **T0** | Depth Anything V2 **base** | ~0.4GB | ❌ | **Apache-2.0** | ~2GB |
+
+> **설치 금지 조건**: 라이선스 확인(Q9) 전에는 Animagine XL 4.0 · TRELLIS.2 · Hunyuan3D 설치하지 않는다(NFR-07 상업 이용).
+> **Depth Anything V2 large 금지** — CC-BY-NC(비상업). **base**만 사용.
+> **Mixamo 미채택** — Adobe 서버 업로드 필요(NFR-06 오프라인·NFR-08 프라이버시 위반). 리깅은 Rigify.
+> **디스크**: 현재 여유 293.5GB → 전부 설치 시 약 **25GB** 추가. 문제 없음.
 
 ---
 
@@ -195,3 +216,4 @@ Remove-Item "C:\Users\mbc\mokhwa" -Recurse -Force
 |---|---|---|
 | v0.1 | 2026-11-14 | P0 코스 A 설치 완료 기록. ComfyUI 0.45.0 + Wan 2.2 TI2V-5B + RealVisXL + FFmpeg. 실측 성능·함정 정리 |
 | v0.2 | 2026-11-16 | 품질 실측 9회 추가(§5.1). 확정 설정(shift=8·fp8·I2V·PNG마스터) 명시. 함정 5종 추가. I2V 1280×704 21.7분/5초 실측 |
+| v0.3 | 2026-11-16 | §3을 3.1(설치 완료)·3.2(렌더 모드 확장용)으로 분리. M-B·M-C·T0 모델 12종 목록 + 라이선스·VRAM·미설치 표시. Depth Anything V2 large(CC-BY-NC) 금지·Mixamo 미채택 근거 명시(D58~D61) |
