@@ -28,13 +28,14 @@
 
 | 문서 | 상태 | 목적 |
 |---|---|---|
-| [`docs/DESIGN.md`](docs/DESIGN.md) | ✅ 완료 (D1~D61) | 단일 설계 기준서 — 결정 로그·파이프라인·데이터 구조·브랜딩 |
+| [`docs/DESIGN.md`](docs/DESIGN.md) | ✅ 완료 (D1~D62) | 단일 설계 기준서 — 결정 로그·파이프라인·데이터 구조·브랜딩 |
 | [`docs/PRD.md`](docs/PRD.md) | ✅ v0.3 | 제품 요구사항 — 대상·시나리오·기능(FR 25)·비기능(NFR)·수용 기준 |
 | [`docs/design/DESIGN-PLAN.md`](docs/design/DESIGN-PLAN.md) | ⚠️ 모드 UI 미반영 | Figma 비주얼/UI·UX 기획 — 화면·토큰·컴포넌트·플로우 |
 | [`docs/ENVIRONMENT.md`](docs/ENVIRONMENT.md) | ✅ P0 완료 (v0.3) | 설치 경로·모델 목록(모드별)·실측 성능·설치 함정 |
+| [`engine/`](engine/README.md) | ✅ P1 코어 (M-A) | 구현체 — `mokhwa.cmd` CLI · 대본→키프레임→I2V→조립 · 모듈 규격 |
 | [`docs/prompts/figma-uiux.md`](docs/prompts/figma-uiux.md) | ✅ v2 | Big Pickle + Figma MCP 실행 프롬프트 |
 | `docs/ARCHITECTURE.md` | ⏸ 대기 | 컴포넌트·인터페이스 상세 |
-| `docs/TASKS.md` | ⏸ 대기 | P0~P7 티켓 분해 + DoD |
+| `docs/TASKS.md` | ✅ P0~P7 (55티켓) | 티켓 분해 + DoD + 게이트 매핑 |
 | `docs/AGENTS.md` · `docs/CONTEXT.md` | ⏸ 대기 | Qwen 에이전트 지침 / 세션 주입 요약 |
 | `docs/prompts/P*.md` | ⏸ 대기 | 단계별 구현 프롬프트 |
 
@@ -43,13 +44,13 @@
 ## 개발 순서 (확정)
 
 ```
-상세기획  →  PRD 작성  →  비주얼 디자인 · UI/UX (Figma 우선)  →  구현
-   ✅            ✅                       ← 지금 여기              ⏸ 승인 후
+상세기획  →  PRD 작성  →  비주얼 디자인 · UI/UX (Figma 우선)  →  구현 (P1 코어)
+   ✅            ✅           ⚠️ Starter 호출 한도(Q8) 대기 중        🔄 진행 중
 ```
 
 - 기획·설계·문서: **Big Pickle** (이 세션)
-- 구현 코딩: 로컬 **`qwen3-coder:30b`** (OpenCode ↔ Ollama)
-- **D39: 사용자 승인 전 구현 착수 금지**
+- 구현 코딩: 로컬 **`qwen3-coder:30b`** (OpenCode ↔ Ollama) + 설계 변경·디버깅은 Big Pickle (D47)
+- **D39: 사용자 승인 전 구현 착수 금지** — P1은 D62로 승인됨
 
 ---
 
