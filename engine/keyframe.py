@@ -16,10 +16,18 @@ from . import project as project_mod
 from .comfy import Comfy
 from .config import Config
 from .errors import CineError
-from .script import KEYFRAME_NEGATIVE, STYLES
+from .script import KEYFRAME_NEGATIVE, STYLES, anchor_text
 
 SEEDS = (101, 202, 303, 404)
 _REGION = 0.4
+
+
+def prompt_for(project: project_mod.Project, scene: dict) -> str:
+    """bible 앵커 + 화면 설명 + 화풍. 앵커가 인물·장소·조명을 씬 사이에 고정한다."""
+    style = STYLES.get(project.style, STYLES["cinematic"])
+    anchors = anchor_text(project.bible(), list(scene.get("anchors") or []))
+    parts = [p for p in (anchors, scene["visual"]) if p]
+    return f"{', '.join(parts)}, {style['suffix']}"
 
 
 def _laplacian_var(path: Path) -> tuple[float, float]:
@@ -83,6 +91,7 @@ def stage_key(cfg: Config, project: project_mod.Project, scene: dict) -> str:
         {
             "stage": "keyframe",
             "visual": scene["visual"],
+            "anchors": anchor_text(project.bible(), list(scene.get("anchors") or [])),
             "seeds": SEEDS,
             "steps": cfg.keyframe_steps,
             "size": [cfg.width, cfg.height],
@@ -104,8 +113,7 @@ def generate(
     if dest.exists() and not force:
         return dest, {"cached": True}
 
-    style = STYLES.get(project.style, STYLES["cinematic"])
-    prompt = f"{scene['visual']}, {style['suffix']}"
+    prompt = prompt_for(project, scene)
     best: tuple[Path, int, float] | None = None
     candidates: list[dict] = []
 

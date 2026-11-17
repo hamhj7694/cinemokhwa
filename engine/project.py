@@ -89,6 +89,20 @@ class Project:
             return []
         return json.loads(self.script_path.read_text(encoding="utf-8"))["scenes"]
 
+    def bible(self) -> dict:
+        """연속성 앵커(인물·장소·조명). 구버전 script.json이면 빈 값."""
+        if not self.script_path.exists():
+            return {"characters": [], "places": [], "look": ""}
+        raw = json.loads(self.script_path.read_text(encoding="utf-8"))
+        bible = raw.get("bible")
+        if not isinstance(bible, dict):
+            return {"characters": [], "places": [], "look": ""}
+        return {
+            "characters": bible.get("characters") or [],
+            "places": bible.get("places") or [],
+            "look": str(bible.get("look") or ""),
+        }
+
     def scene(self, scene_id: int) -> dict:
         for s in self.scenes():
             if int(s["id"]) == int(scene_id):

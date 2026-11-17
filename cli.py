@@ -75,6 +75,18 @@ def estimate_minutes(cfg: Config, scenes: int) -> float:
     return keyframes + clips + 1.0
 
 
+def chain_sources(project: project_mod.Project) -> dict[int, int | None]:
+    """같은 shot에서 앞 장면 id. 다른 shot이면 None(=컷). D63."""
+    previous: dict[int, int | None] = {}
+    by_shot: dict[str, int] = {}
+    for s in project.scenes():
+        sid = int(s["id"])
+        shot = str(s.get("shot") or f"S{sid}")
+        previous[sid] = by_shot.get(shot)
+        by_shot[shot] = sid
+    return previous
+
+
 # --------------------------------------------------------------------- pipeline
 def run_pipeline(
     cfg: Config,
@@ -138,12 +150,23 @@ def run_pipeline(
 
     # 3. 클립 -------------------------------------------------------------
     step(3, total, f"영상 클립 (Wan I2V · {cfg.i2v_steps}스텝 · {cfg.width}×{cfg.height})")
+    chain_of = chain_sources(project)
     clip_keys = []
+    chain_dirs: dict[int, Path | None] = {}
     for s in scenes:
-        kf = project.keyframe_path(s["id"])
+        sid = int(s["id"])
+        kf = project.keyframe_path(sid)
         if not kf.exists():
             raise CineError("PROJECT-004", f"키프레임이 없습니다: {kf.name}", hint="2단계를 먼저 실행하세요.")
-        clip_keys.append(i2v.stage_key(cfg, project, s, kf))
+        prev = chain_of.get(sid)
+        if prev is None:
+            prev_key = None
+            chain_dirs[sid] = None
+        else:
+            prev_clip = project.clip_path(prev)
+            prev_key = project_mod.file_digest(prev_clip) if prev_clip.exists() else "pending"
+            chain_dirs[sid] = project.frames / f"scene_{prev:02d}"
+        clip_keys.append(i2v.stage_key(cfg, project, s, kf, prev_key))
     key = project_mod.digest({"stage": "clips", "items": clip_keys})
     clips_ready = all(project.clip_path(s["id"]).exists() for s in scenes)
     if project.done("clips", key) and clips_ready and not force:
@@ -154,7 +177,9 @@ def run_pipeline(
         meta = []
         try:
             for idx, s in enumerate(scenes, start=1):
-                say(f"      장면 {s['id']:02d} 시작 (예상 {(0.72 * cfg.i2v_steps + 3.6):.0f}분)")
+                chain_dir = chain_dirs[int(s["id"])]
+                tag = " · 연장" if chain_dir is not None else ""
+                say(f"      장면 {s['id']:02d} 시작{tag} (예상 {(0.72 * cfg.i2v_steps + 3.6):.0f}분)")
                 path, info = i2v.generate(
                     cfg,
                     comfy,
@@ -162,9 +187,15 @@ def run_pipeline(
                     s,
                     project.keyframe_path(s["id"]),
                     force=force,
+                    chain_from=chain_dir,
                 )
                 meta.append({"scene": s["id"], **info})
-                note = "캐시" if info.get("cached") else f"{info['frames']}프레임 {human(info['seconds'])}"
+                if info.get("cached"):
+                    note = "캐시"
+                else:
+                    note = f"{info['frames']}프레임 {human(info['seconds'])}"
+                    if info.get("seam_mae") is not None:
+                        note += f" · 이음새 MAE {info['seam_mae']}"
                 say(f"      장면 {s['id']:02d} 완료 — {note} · 누적 {human(time.time() - t)}")
                 if idx == 1:
                     comfy.free_memory()
@@ -426,7 +457,7 @@ def cmd_verify(args: argparse.Namespace) -> int:
     return 0 if result["overall"] != "FAIL" else 9
 
 
-
+def cmd_batch(args: argparse.Namespace) -> int:
     path = Path(args.file)
     if not path.exists():
         raise CineError("CFG-003", f"배치 파일이 없습니다: {path}")

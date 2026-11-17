@@ -36,10 +36,56 @@ M-B(2D 셀)·M-C(3D)·T0는 각각 P2.5 / P3.5 / P1.5에서 이 패키지 옆에
 | `errors.py` | `CineError` + 종료 코드 | 코드 접두사가 종료 코드 |
 | `comfy.py` | ComfyUI HTTP | `/prompt` · `/history` · `/upload/image` · `/free` |
 | `project.py` | run 디렉터리·state·재개 | `done(stage,key)` = 상태 AND 입력 해시 일치 |
-| `script.py` | 대본 JSON (gemma4:12b) | 1회 교정 후 실패하면 중단(임의 생성 금지) |
-| `keyframe.py` | SDXL 4시드 → 최고 선택 | 중앙 40% 라플라시안 분산 |
-| `i2v.py` | Wan I2V → PNG 마스터 → CRF16 | `length=4k+1` · shift 8 · fp8 |
-| `assemble.py` | 인코딩·크로스페이드·타임라인 | `sum(d) - crossfade×(n-1)` |
+| `script.py` | 대본 JSON (gemma4:12b) | 1회 교정 후 실패하면 중단(임의 생성 금지) · `bible`/`shot`/`anchors` 검증 |
+| `keyframe.py` | SDXL 4시드 → 최고 선택 | 중앙 40% 라플라시안 분산 · 앵커 프롬프트 주입 |
+| `i2v.py` | Wan I2V → PNG 마스터 → CRF16 | `length=4k+1` · shift 8 · fp8 · 같은 `shot`은 마지막 프레임에서 연장 |
+| `assemble.py` | 인코딩·크로스페이드·타임라인 | `sum(d) - crossfade×(n-1)` · `timeline`에 `shot` |
+
+## 장면 간 일관성 (D63~D65)
+
+두 축으로 나눈다. **연장은 픽셀, 컷은 앵커.**
+
+| 축 | 트리거 | 수단 |
+|---|---|---|
+| 연장 | 앞 장면과 `shot`이 같다 | 앞 클립 **마지막 PNG**를 다음 클립 `start_image`로 넣는다 |
+| 컷 | `shot`이 다르다 | **bible 앵커**(`char:`/`place:` + `look`)를 키프레임 프롬프트에 주입한다 |
+
+`script.json`(`schema: 2`)이 이 정보를 담는다.
+
+```json
+{"schema": 2,
+ "bible": {"characters": [{"id": "mina", "desc": "woman in a navy trench coat"}],
+           "places":     [{"id": "alley", "desc": "narrow Seoul alley, wet asphalt"}],
+           "look": "rainy blue hour, soft practical light"},
+ "scenes": [{"id": 1, "shot": "S1", "anchors": ["char:mina", "place:alley"], "visual": "…"}]}
+```
+
+검증 규칙(어기면 1회 교정 요청 후 **중단**, 임의 보정 없음):
+
+- `anchors`의 `char:`/`place:`는 반드시 `bible`에 존재
+- 같은 `shot`의 장면은 **연속으로 붙어 있어야** 한다(떨어지면 체이닝이 엉뚱한 장면을 잇는다)
+- 구버전 `script.json`(bible/shot 없음)은 각 씬이 자기 `shot`으로 읽혀 **체이닝 0**
+
+### 체이닝 규격 (D65 실측)
+
+| 항목 | 값 |
+|---|---|
+| 겹침 | **0프레임.** 앞 클립 마지막 프레임에서 그대로 시작 |
+| 생성 길이 | 연장도 `4k+1` 그대로(5초 = 121프레임). 추가 생성 없음 |
+| 이음새 기준 | `seam_mae` ≤ **3.0** (`verify.MAE_PASS`와 동일) |
+| 대가 | 시작 프레임 1장이 앞 클립 마지막과 거의 같다(0.04초). 조립 크로스페이드가 덮는다 |
+| 기록 | `state.json` clips 항목의 `overlap` · `seam_mae`, `timeline.json`의 `shot` |
+
+겹침 8을 쓰지 않는 이유(832×480/6스텝 2클립 실측):
+
+| 방식 | 이음새 MAE | 판정 |
+|---|---|---|
+| 겹침 0 · 시작 = 마지막 | **1.17** | ✅ 기준 3.0 이내 |
+| 겹침 8 · 시작 = 마지막 | 39.89 | ❌ 트림한 8프레임만큼 시간이 건너뜀 |
+| 겹침 8 · 시작 = 8프레임 앞 | 47.52 | ❌ 생성된 8프레임이 원본과 달라 정렬이 안 됨 |
+
+모델은 시작 이미지를 거의 그대로 재현한다(MAE 1.17 / 1.30). 그래서 **시작점을 정확히
+마지막 프레임에 두는 것**이 가장 중요한 변수이고, 겹침은 정렬 오차만 더한다.
 
 ## 고정 규격 (바꾸지 말 것)
 
@@ -59,6 +105,9 @@ M-B(2D 셀)·M-C(3D)·T0는 각각 P2.5 / P3.5 / P1.5에서 이 패키지 옆에
 | 바꾼 것 | 다시 도는 단계 |
 |---|---|
 | 주제·길이·화풍·LLM | script → 이후 전부 |
+| `SYSTEM` 프롬프트·스키마 | script → 이후 전부 |
+| bible·anchors | keyframes → clips → assemble |
+| `shot` 배치(어떤 씬이 연장인지) | clips → assemble |
 | visual 프롬프트 | keyframes → clips → assemble |
 | motion 프롬프트·스텝 | clips → assemble |
 | 크로스페이드·CRF | assemble |
@@ -81,6 +130,9 @@ M-B(2D 셀)·M-C(3D)·T0는 각각 P2.5 / P3.5 / P1.5에서 이 패키지 옆에
 | 2026-11-16 | 스모크 2씬 · 832×480 · 6스텝 | 클립 2×121프레임 → 235프레임 9.79초 완성. 대본 48초 · 키프레임 2분 25초 · 클립 6분 18초 |
 | 2026-11-16 | **본 검증 3씬 · 1280×704 · 20스텝** | `final.mp4` **349프레임 14.54초** 11.07MB 6.09Mbps · 클립 3×121프레임(각 5.04초, 18분 03초/개) · 대본 51초 · 키프레임 5분 21초 · 클립 54분 10초 · 조립 7초 · **벽시계 60.5분 ≤ 70분 예산** |
 | 2026-11-16 | 본 검증 수치 보조(PRD §13.5) | YDIF 중앙값 1.04~6.99 **PASS** · 첫 프레임-키프레임 MAE ≤ 2.15 **PASS** · 장면 3의 중앙 선명도 0.61·YAVG σ 11.6은 **대본 의도(뒷모습·원경·보케)로 설명됨** — 육안 판정 대기 |
+| 2026-11-17 | 일관성 통합 2씬 · 832×480 · 6스텝 (같은 `shot`) | 대본 schema 2 · 앵커 키프레임 · 클립 2×121프레임 · **연장 이음새 MAE 1.17** · `timeline` shot `S1/S1` · 총 9.783초 · exit 0 |
+| 2026-11-17 | 이음새 방식 비교(같은 조건, 시도별 파일 분리 측정) | 시작 재현 MAE 1.17(A121)/1.30(A113) · 겹침 8은 39.89·47.52 → **겹침 0 확정(D65)** |
+| 2026-11-17 | 대본 규칙 4(같은 shot = 구도 유지) 실 LLM 확인 | `gemma4:12b` 1회: 15초 3씬 → shot `S1/S1/S2`, 1→2는 "same medium shot · continues the slow zoom", 3은 wide로 컷. schema 2·bible·anchors 정상 |
 
 ### 수치 보조의 한계 (P1-08 설계 시 반영)
 

@@ -188,6 +188,7 @@ def write_timeline(
         entries.append(
             {
                 "scene": scene.get("id", i + 1),
+                "shot": scene.get("shot") or f"S{scene.get('id', i + 1)}",
                 "file": clip.name,
                 "seconds": round(dur, 3),
                 "start": round(cursor, 3),
