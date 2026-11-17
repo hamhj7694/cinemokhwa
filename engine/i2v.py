@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import os
 import shutil
+import time
 from pathlib import Path
 
 import numpy as np
@@ -200,6 +201,7 @@ def generate(
     estimate_min = (0.72 * cfg.i2v_steps + 3.6) * (total / frames) * (seconds / cfg.clip_seconds)
     timeout_s = estimate_min * 60 * 2.5 + 600
 
+    t0 = time.time()
     record = comfy.run(
         workflow,
         f"I2V 장면 {scene['id']:02d} ({seconds:.1f}초, {total}프레임"
@@ -207,6 +209,7 @@ def generate(
         + ")",
         timeout_s=timeout_s,
     )
+    gen_seconds = time.time() - t0
 
     files = comfy.materialize(record, project.frames / f"scene_{scene['id']:02d}")
     if len(files) < overlap + frames:
@@ -246,5 +249,7 @@ def generate(
         "file": dest.name,
         "overlap": overlap,
         "seam_mae": seam,
+        "gen_seconds": round(gen_seconds, 1),
+        "elapsed": round(time.time() - t0, 1),
     }
     return dest, meta

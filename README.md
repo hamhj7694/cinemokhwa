@@ -28,7 +28,9 @@
 
 | 문서 | 상태 | 목적 |
 |---|---|---|
-| [`docs/DESIGN.md`](docs/DESIGN.md) | ✅ 완료 (D1~D62) | 단일 설계 기준서 — 결정 로그·파이프라인·데이터 구조·브랜딩 |
+| [`docs/HANDOFF.md`](docs/HANDOFF.md) | ✅ 최신 (2026-11-17) | **인수인계** — 목적·현재 상태·실행법·함정·용어를 한 문서에 |
+| [`docs/WORKLOG.md`](docs/WORKLOG.md) | ✅ 최신 | **작업·실측 로그** — run별 조건·단계별 소요·결과·모델 성능 기준값 |
+| [`docs/DESIGN.md`](docs/DESIGN.md) | ✅ 완료 (D1~D65) | 단일 설계 기준서 — 결정 로그·파이프라인·데이터 구조·브랜딩 |
 | [`docs/PRD.md`](docs/PRD.md) | ✅ v0.3 | 제품 요구사항 — 대상·시나리오·기능(FR 25)·비기능(NFR)·수용 기준 |
 | [`docs/design/DESIGN-PLAN.md`](docs/design/DESIGN-PLAN.md) | ⚠️ 모드 UI 미반영 | Figma 비주얼/UI·UX 기획 — 화면·토큰·컴포넌트·플로우 |
 | [`docs/ENVIRONMENT.md`](docs/ENVIRONMENT.md) | ✅ P0 완료 (v0.3) | 설치 경로·모델 목록(모드별)·실측 성능·설치 함정 |

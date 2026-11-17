@@ -125,10 +125,38 @@ def run_pipeline(
 
     # 2. 키프레임 ---------------------------------------------------------
     step(2, total, "키프레임 (SDXL 4시드 → 중앙 선명도 최고)")
-    kf_keys = [keyframe.stage_key(cfg, project, s) for s in scenes]
+    chain_of = chain_sources(project)
+    stage_ids = {int(s["id"]) for s in scenes}
+    # 참조 대상은 대본만 보고 정한다(파일 존재 여부에 캐시 키가 흔들리지 않게).
+    refs: dict[int, dict | None] = {}
+    for s in project.scenes():
+        sid = int(s["id"])
+        # 같은 shot의 연장은 앞 클립 프레임을 이미 start_image로 쓰므로 참조가 불필요하다.
+        if chain_of.get(sid) is not None or cfg.kf_reference == "none":
+            refs[sid] = None
+            continue
+        target = keyframe.reference_target(project, s)
+        if target is None:
+            refs[sid] = None
+            continue
+        tid, label = target
+        digest = ""
+        if tid not in stage_ids:   # 이번 실행에서 다시 만들지 않는 대상만 파일 해시 반영
+            path = keyframe.reference_path(project, tid)
+            digest = project_mod.file_digest(path) if path else "none"
+        refs[sid] = {"target": tid, "label": label, "digest": digest}
+    kf_keys = [
+        keyframe.stage_key(
+            cfg, project, s,
+            ref_target=refs[int(s["id"])]["target"] if refs[int(s["id"])] else None,
+            ref_digest=refs[int(s["id"])]["digest"] if refs[int(s["id"])] else None,
+        )
+        for s in scenes
+    ]
     key = project_mod.digest({"stage": "keyframes", "items": kf_keys})
     kf_ready = all(project.keyframe_path(s["id"]).exists() for s in scenes)
-    if project.done("keyframes", key) and kf_ready and not force:
+    key_changed = not project.done("keyframes", key)
+    if not key_changed and kf_ready and not force:
         skip(f"{len(scenes)}장")
     else:
         project.begin("keyframes", key)
@@ -136,9 +164,23 @@ def run_pipeline(
         meta = []
         try:
             for s in scenes:
-                path, info = keyframe.generate(cfg, comfy, project, s, force=force)
+                info_ref = refs[int(s["id"])]
+                ref, ref_label = (None, "")
+                if info_ref:
+                    ref = keyframe.reference_path(project, info_ref["target"])
+                    ref_label = info_ref["label"]
+                path, info = keyframe.generate(
+                    cfg, comfy, project, s,
+                    reference=ref, reference_label=ref_label,
+                    force=force or key_changed,
+                )
                 meta.append({"scene": s["id"], **info})
-                note = "캐시" if info.get("cached") else f"seed={info['seed']} 중앙={info['center_sharpness']}"
+                if info.get("cached"):
+                    note = "캐시"
+                else:
+                    note = f"seed={info['seed']} 중앙={info['center_sharpness']}"
+                    if info.get("reference"):
+                        note += f" · 참조 {info['reference']}({info['reference_mode']})"
                 say(f"      장면 {s['id']:02d} — {note}")
         except CineError as exc:
             project.fail("keyframes", str(exc))

@@ -45,6 +45,15 @@ class Config:
     crossfade_seconds: float = 0.3
     crf: int = 16
 
+    # --- 컷 사이 참조 주입 (D64) ---
+    # "ipadapter" | "img2img" | "none". ipadapter가 실패하면 img2img로 자동 폴백한다.
+    kf_reference: str = field(
+        default_factory=lambda: os.environ.get("CINEMOKHWA_KF_REF", "ipadapter").strip().lower()
+    )
+    ipadapter_preset: str = "PLUS (high strength)"
+    ipadapter_weight: float = 0.8
+    img2img_denoise: float = 0.55
+
     # --- 모델 파일명 (ENVIRONMENT §3.1) ---
     sdxl_ckpt: str = "RealVisXL_V5.0_fp16.safetensors"
     wan_unet: str = "wan2.2_ti2v_5B_fp16.safetensors"

@@ -37,7 +37,7 @@ M-B(2D 셀)·M-C(3D)·T0는 각각 P2.5 / P3.5 / P1.5에서 이 패키지 옆에
 | `comfy.py` | ComfyUI HTTP | `/prompt` · `/history` · `/upload/image` · `/free` |
 | `project.py` | run 디렉터리·state·재개 | `done(stage,key)` = 상태 AND 입력 해시 일치 |
 | `script.py` | 대본 JSON (gemma4:12b) | 1회 교정 후 실패하면 중단(임의 생성 금지) · `bible`/`shot`/`anchors` 검증 |
-| `keyframe.py` | SDXL 4시드 → 최고 선택 | 중앙 40% 라플라시안 분산 · 앵커 프롬프트 주입 |
+| `keyframe.py` | SDXL 4시드 → 최고 선택 | 중앙 40% 라플라시안 분산 · 앵커 프롬프트 · 컷 장면은 IPAdapter/img2img 참조 |
 | `i2v.py` | Wan I2V → PNG 마스터 → CRF16 | `length=4k+1` · shift 8 · fp8 · 같은 `shot`은 마지막 프레임에서 연장 |
 | `assemble.py` | 인코딩·크로스페이드·타임라인 | `sum(d) - crossfade×(n-1)` · `timeline`에 `shot` |
 
@@ -48,7 +48,7 @@ M-B(2D 셀)·M-C(3D)·T0는 각각 P2.5 / P3.5 / P1.5에서 이 패키지 옆에
 | 축 | 트리거 | 수단 |
 |---|---|---|
 | 연장 | 앞 장면과 `shot`이 같다 | 앞 클립 **마지막 PNG**를 다음 클립 `start_image`로 넣는다 |
-| 컷 | `shot`이 다르다 | **bible 앵커**(`char:`/`place:` + `look`)를 키프레임 프롬프트에 주입한다 |
+| 컷 | `shot`이 다르다 | **bible 앵커**(`char:`/`place:` + `look`)를 키프레임 프롬프트에 주입하고, 앞 장면 **키프레임을 참조 이미지로** 넣는다 |
 
 `script.json`(`schema: 2`)이 이 정보를 담는다.
 
@@ -87,6 +87,31 @@ M-B(2D 셀)·M-C(3D)·T0는 각각 P2.5 / P3.5 / P1.5에서 이 패키지 옆에
 모델은 시작 이미지를 거의 그대로 재현한다(MAE 1.17 / 1.30). 그래서 **시작점을 정확히
 마지막 프레임에 두는 것**이 가장 중요한 변수이고, 겹침은 정렬 오차만 더한다.
 
+### 컷 사이 참조 주입 (D64)
+
+`shot`이 바뀌는 장면은 픽셀을 잇지 않는다. 대신 **그 인물이 나온 가장 가까운 앞
+장면의 키프레임**을 SDXL 키프레임 생성에 참조로 넣는다.
+
+| 항목 | 값 |
+|---|---|
+| 대상 | 컷 장면 중 `char:` 앵커가 있는 장면. 연장(같은 `shot`)은 체이닝이 대신하므로 참조 없음 |
+| 참조 선택 | 앞 장면을 역순으로 훑어 `char:` 앵커가 겹치는 첫 장면의 키프레임(없으면 그 클립 첫 프레임) |
+| 1순위 | `IPAdapterUnifiedLoader`(`PLUS (high strength)`) → `IPAdapterAdvanced` (weight 0.8, linear, V only) |
+| 폴백 | 같은 시드에서 `LoadImage` → `ImageScale` → `VAEEncode` → `KSampler(denoise 0.55)` |
+| 끄기 | `CINEMOKHWA_KF_REF=none` (또는 `img2img`로 고정) |
+| 캐시 | 참조 **대상 장면 id** + 방식이 키프레임 캐시 키에 들어간다(같은 실행에서 앞 키프레임이 아직 없어도 키가 안정). 이번 실행에 포함되지 않은 대상만 파일 해시를 더한다 |
+
+실측(832×480/8스텝, 같은 프롬프트·같은 시드):
+
+| 확인 | 값 | 의미 |
+|---|---|---|
+| IPAdapter가 출력에 주는 영향 | w0.0 vs w1.0 **MAE 54.82** | 노드가 무시되지 않고 실제로 반영됨 |
+| 폴백 | 프리셋을 일부러 깨뜨림 → `COMFY-002` → img2img로 성공 | 자동 폴백 동작 |
+| 소요 | 키프레임 1장 5~20초(모델 로드 포함) · 4시드 × 3씬 **3분 41초**(참조 포함, 832×480/32스텝) | 4시드 × 3씬 ≈ 2~4분 |
+
+인물 동일성은 수치로 판정하지 않는다. 픽셀 MAE는 구도가 달라지면 의미가 없고,
+PRD §13.5와 같이 **육안 판정**이 우선이다. 파이프라인은 "참조가 실제로 쓰였는가"까지만 보증한다.
+
 ## 고정 규격 (바꾸지 말 것)
 
 - **프레임 수**: `length = 4k+1`, 목표 이상으로 **올림**. 24fps 5초 = **121프레임(5.04초)**.
@@ -107,10 +132,15 @@ M-B(2D 셀)·M-C(3D)·T0는 각각 P2.5 / P3.5 / P1.5에서 이 패키지 옆에
 | 주제·길이·화풍·LLM | script → 이후 전부 |
 | `SYSTEM` 프롬프트·스키마 | script → 이후 전부 |
 | bible·anchors | keyframes → clips → assemble |
+| 참조 이미지(`char:` 앞 장면 내용)·`CINEMOKHWA_KF_REF` | keyframes → clips → assemble |
 | `shot` 배치(어떤 씬이 연장인지) | clips → assemble |
 | visual 프롬프트 | keyframes → clips → assemble |
 | motion 프롬프트·스텝 | clips → assemble |
 | 크로스페이드·CRF | assemble |
+
+`state.json`의 `keyframes.items[]`에는 장면별 선택 시드·선명도·참조 방식·`elapsed`,
+`clips.items[]`에는 프레임 수·재생 길이·`overlap`·`seam_mae`·`gen_seconds`·`elapsed`가 남는다.
+run 단위 요약은 `docs/WORKLOG.md`에 1행으로 적는다(TASKS §0 규칙 8).
 
 ## 종료 코드
 
@@ -133,6 +163,8 @@ M-B(2D 셀)·M-C(3D)·T0는 각각 P2.5 / P3.5 / P1.5에서 이 패키지 옆에
 | 2026-11-17 | 일관성 통합 2씬 · 832×480 · 6스텝 (같은 `shot`) | 대본 schema 2 · 앵커 키프레임 · 클립 2×121프레임 · **연장 이음새 MAE 1.17** · `timeline` shot `S1/S1` · 총 9.783초 · exit 0 |
 | 2026-11-17 | 이음새 방식 비교(같은 조건, 시도별 파일 분리 측정) | 시작 재현 MAE 1.17(A121)/1.30(A113) · 겹침 8은 39.89·47.52 → **겹침 0 확정(D65)** |
 | 2026-11-17 | 대본 규칙 4(같은 shot = 구도 유지) 실 LLM 확인 | `gemma4:12b` 1회: 15초 3씬 → shot `S1/S1/S2`, 1→2는 "same medium shot · continues the slow zoom", 3은 wide로 컷. schema 2·bible·anchors 정상 |
+| 2026-11-17 | 참조 대상 계산 시점 버그 | 3씬 통합 1차 실행에서 장면 3 참조가 `none`. 원인: 키프레임 생성 **전에** 참조 파일을 찾아 아직 없었음 → 대상은 대본으로 정하고 경로는 생성 시점에 찾도록 수정. 전체 실행 키는 대상 id 기반이라 생성 전후 동일(부분 재실행만 파일 해시 반영) |
+| 2026-11-17 | **참조 통합 3씬 · 832×480 · 6스텝**(`refpipe-01`, S1·S1·S2) | 장면 1·2 `reference_mode=none`, 장면 3 **`ipadapter` · 참조 `keyframe02`** · 장면 2 연장 이음새 **MAE 1.17** · `timeline` `S1/S1/S2` · **349프레임 14.54초 6.97MB 3.83Mbps** · 단계 0.1/220.6/535.0/4.0초(합 12.7분) · 같은 `--run-id` 재실행 시 **4단계 전부 건너뜀**(exit 0) |
 
 ### 수치 보조의 한계 (P1-08 설계 시 반영)
 
