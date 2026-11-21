@@ -1,6 +1,7 @@
 # 신규 파이프라인 연구 — 정체성·구도 우선 하이브리드 (P2)
 
-> 작성: 2026-11-21 · 개정: 2026-11-21 · 상태: **연구 완료 / 구현 전**
+> 작성: 2026-11-21 · 개정: 2026-11-21 (2차) · 상태: **연구 완료 / 설치 진행 중**
+> 2차 개정: **GGUF 경로 확정** (12GB 실행 가능) + 공식 **Layout-to-Render IC-LoRA** 발견 + **MSR V2 다중 참조** 채택
 > 배경: 사용자의 육안 판정 — *"지금도 다른 인물 같아. 지금 방식 그대로 하면 완성도 높은 영상 만들기는 어려울 거 같아. 일단 보류하고 다른 신규 파이프라인을 연구해보자!"*
 > 사용자 제안 원문 — *"여러 객체나 인물이나 배경 요소를 핀 처럼 앵커하거나 고정하거나, ltx-2.5 사용하거나, 스테이블 디퓨전쓰거나, 블렌더로 풀 영상 구도 3d 모델링 먼저하고 그 위에 실사를 입히는 방식이나, 혹은 이러한 방식들을 혼합하는 방식으로 진행하자!!!!!!!!"*
 > 결정: 기존 3D 가이드 파이프라인(D63~D72)은 **보류**. 신규 run ID는 `p2-*`.
@@ -18,10 +19,10 @@
 
 | 사용자 제안 | 기술적 해석 | 담당 계층 | 핵심 근거 |
 |---|---|---|---|
-| ① 핀/앵커/고정 | 프레임·객체 단위 참조 고정 | L2·L3 | LTX-2.5 `--image PATH FRAME_IDX STRENGTH` 멀티 앵커 + FL-Path Point Tool + Blender 객체 ID |
-| ② LTX-2.5 | 22B 영상 모델, **native multishot** | L3 영상화 | 컷을 넘어 인물·환경·조명·스타일 유지 = scene 2 이탈의 직접 해독제 |
+| ① 핀/앵커/고정 | 프레임·객체 단위 참조 고정 | L2·L3 | LTX `--image PATH FRAME_IDX STRENGTH` + **MSR V2 슬롯 임베딩(최대 5개)** + FL-Path Point Tool + Blender 객체 ID |
+| ② LTX-2.5 | 22B 영상 모델, **native multishot**, GGUF 양자화 | L3 영상화 | 컷을 넘어 인물·환경·조명 유지 = scene 2 해독제. **UD-Q3_K_XL 12GB로 3060 실행** |
 | ③ Stable Diffusion | SDXL 캐릭터 LoRA + ControlNet | L0·L2 | 정체성의 단일 원본을 가중치에 새김. 실사 질감 담당 |
-| ④ Blender 풀 3D → 실사 입히기 | 15초 전체 프리비즈를 3D로 확정 후 렌더 위에 생성 | L1 | BlenderFusion 원칙: **제어와 생성 분리** |
+| ④ Blender 풀 3D → 실사 입히기 | 15초 전체 프리비즈를 3D로 확정 후 렌더 위에 생성 | L1·L3 | **공식 Layout-to-Render IC-LoRA**가 클레이 영상 → 실사 샷을 그대로 수행 |
 | ⑤ 혼합 | 위 4개를 계층으로 결합 | 전체 | 단일 모델로는 VRAM·정체성·구도를 동시에 못 잡음 |
 
 > 한 줄 요약: **Blender가 "어디에 무엇이 있는지"를 15초 내내 지배하고, SDXL이 "누구인지"를 지배하고, LTX-2.5가 "어떻게 움직이는지"를 담당한다.**
@@ -70,26 +71,31 @@ SFace 코사인 판정 경계는 약 **0.36**(이하면 타인).
 | 라이선스 | **LTX-2.x Community License** (2026-08-11 제정, 2026-11-11 개정). 연매출 **$10M 미만** 무료 상업 사용. 이상은 유료 계약 | 개인/소규모 프로젝트는 무료. 단 파인튜닝 이전(transfer)은 유료 가능 |
 | 구조 | 22B DiT 분할 safetensors + **Gemma4 12B** 텍스트 인코더 + Video/ Audio VAE + spatial/temporal x2 업스케일러 | 컴포넌트별 로딩. 텍스트 인코더도 12B → VRAM 계산에 포함해야 함 |
 | 증류 모델 | distilled DiT: **고정 8스텝, CFG=1** | 20스텝 요구사항보다 빠름. 품질은 dev-transformer + distilled LoRA로 보완 |
-| **저VRAM 공식 옵션** | `--quantization fp8-cast --offload cpu` (bf16 체크포인트 + 실시간 fp8 캐스팅 + CPU 오프로드) | **12GB에서 실행 가능성 있음**. 단 속도 실측 필요 |
-| 사용 불가 양자화 | `nvfp4`는 **Blackwell 전용** → RTX 3060(Ampere)에서 불가. `comfy-int8-convrot`는 ComfyUI 전용 | 우리 경로는 `fp8-cast` 또는 ComfyUI int8 |
-| **멀티 앵커** | `--image PATH FRAME_IDX STRENGTH` 를 **여러 번** 지정 가능. frame 0 = 첫 프레임 조건 | 객체/인물/배경을 프레임별로 핀하는 기능이 모델에 이미 있음 |
-| **Native multishot** | 한 패스에서 연결된 여러 샷 생성. 인물·환경·조명·목소리·스타일을 **컷 간에 유지** | scene 2 이탈 문제에 대한 직접 해독제 |
-| 제약 | `num_frames % 8 == 1` (1, 9, …, 49, 121), width/height **32 배수** | 121프레임 ✅, **1280×704 ✅ (40×22)** |
-| 파인튜닝 | dev transformer 완전 학습 가능, `ltx-trainer` 제공. LTX-2.3 LoRA 대부분 2.5에서 그대로 동작 | 캐릭터 LoRA를 SDXL이 아니라 LTX에 직접 새길 수도 있음(업그레이드 경로) |
-| 커뮤니티 | LTX-2 IC-LoRA(Ingredients)로 멀티 서브젝트 참조 사례 보고 | 슬롯 임베딩 기반 다중 인물 고정은 별도 검증 필요 |
+| **저VRAM 공식 옵션** | `--quantization fp8-cast --offload cpu`. **그리고 GGUF 양자화가 더 현실적** | `ComfyUI-GGUF`의 `Unet Loader (GGUF)`로 UD-Q3_K_XL(12GB) 사용 확정 |
+| 사용 불가 양자화 | `nvfp4`는 **Blackwell 전용** → 3060 불가. `comfy-int8-convrot`는 ComfyUI 전용 | 우리 경로는 **GGUF**. bf16 원본(39GB)은 받지 않음 |
+| **GGUF 실측(Unsloth)** | distilled `UD-Q3_K_XL` 12.00GB / LPIPS 0.310 / PSNR 19.1dB. **UD-Q2_K_XL 9.5GB**도 LPIPS 0.416. 공식 샘플이 **1280×704·121프레임·24fps** | 우리 목표 해상도와 동일 조건으로 검증된 조합. 12GB에 딱 맞음 |
+| 텍스트 인코더 GGUF | Gemma4 12B `Q4_K_M` 7.84GB (원본 bf16 24.46GB) | `CLIPLoader (GGUF)`로 로드. 다운로드·VRAM 3배 절감 |
+| **멀티 앵커** | `--image PATH FRAME_IDX STRENGTH` 를 **여러 번** 지정. frame 0 = 첫 프레임, `-1`도 사용 | 객체/인물/배경을 프레임별로 핀하는 기능이 모델에 이미 있음 |
+| **Native multishot** | 한 패스에서 연결된 여러 샷. 인물·환경·조명·목소리·스타일 **컷 간 유지** | scene 2 이탈 문제에 대한 직접 해독제 |
+| 제약 | `num_frames % 8 == 1` (1, 9, …, 49, 121), width/height **32 배수** (Layout-to-Render는 64 배수) | 121프레임 ✅. **1280×704는 32배수(40×22)이자 64배수(20×11)** → 두 파이프라인 모두 그대로 사용 가능 |
+| 파인튜닝 | dev transformer 학습 가능, `ltx-trainer`. LTX-2.3 LoRA 대부분 호환 | 캐릭터 LoRA를 LTX에 직접 새기는 것도 가능(업그레이드 경로) |
+| **공식 IC-LoRA** | **Layout-to-Render**(1.22GB): Blender/Unreal 클레이·블로킹 영상 + 첫 프레임 → 실사. **Stage1 960×544 8스텝 → Stage2 1920×1088 3스텝** | 사용자 제안 ④의 공식 구현. 우리 파이프라인의 핵심 엔진으로 채택 |
+| **공식 Ingredients IC-LoRA** | 멀티 서브젝트 참조, 1.22GB | 다중 인물 확장 후보 |
+| **Licon MSR V2** | **Apache 2.0**, 2.06GB. 최대 **5개 참조 이미지**를 슬롯 임베딩 + 고유 시간 위치로 고정 | 사용자 제안 ①의 직접 구현. 다중 인물/소품 앵커로 채택 |
 
-> 결론: LTX-2.5는 **"불가능"이 아니라 "fp8-cast + offload로 일단 돌려보고 속도를 재야"** 하는 상태다.
-> 22B를 12GB에 억지로 올리는 만큼 15초 ≤70분 목표 달성 여부가 최대 리스크다. §7에 대안 명시.
+> 결론: LTX-2.5는 **GGUF + ComfyUI로 12GB에서 실행 가능**하다. 22B bf16을 억지로 올리는 게 아니라
+> 검증된 양자화 경로(UD-Q3_K_XL 12GB + 텍스트 인코더 Q4_K_M 7.8GB)를 쓴다.
+> 남은 리스크는 **속도**(15초 ≤70분)뿐이며, §7에 대안을 명시했다.
 
 ### 3.2 핀/앵커 구현 옵션
 
 | 옵션 | 라이선스 | 고정 단위 | 12GB | 채택 |
 |---|---|---|---|---|
-| **LTX-2.5 `--image PATH FRAME_IDX STRENGTH`** | LTX-2.x | 프레임 인덱스 + 강도 | fp8-cast 필요 | **1순위** — 모델 네이티브 |
-| **ComfyUI_FL-Path-Animator** (MIT) | MIT | Point Tool = 정적 앵커, Lock Perimeter = 테두리 고정, 121점 리샘플, IMAGE+MASK+STRING 출력 | ✅ 가벼움 | **2순위** — 2D 앵커/마스크 생성기 |
-| **Blender 객체 ID + bbox/depth** | GPL(도구) | 3D 객체 단위. Object Index Pass가 instance mask 제공 | ✅ | **3순위** — 앵커의 "원본 좌표" |
+| **Licon MSR V2** | **Apache 2.0** (어댑터) | 최대 5개 참조 이미지, 슬롯 임베딩 + 고유 시간 위치, 오디오 2명 | GGUF와 함께 사용 | **1순위** — 다중 인물/사물 고정의 직접 구현 |
+| **LTX-2.5 `--image PATH FRAME_IDX STRENGTH`** | LTX-2.x | 프레임 인덱스 + 강도, 여러 번 지정 가능 | GGUF 경로 | **2순위** — 모델 네이티브 프레임 앵커 |
+| **ComfyUI_FL-Path-Animator** (MIT) | MIT | Point Tool = 정적 앵커, Lock Perimeter = 테두리 고정, 121점 리샘플, IMAGE+MASK+STRING 출력 | ✅ 가벼움 | **3순위** — 2D 앵커/마스크 생성기 |
+| **Blender 객체 ID + bbox/depth** | GPL(도구) | 3D 객체 단위. Object Index Pass가 instance mask 제공 | ✅ | 앵커의 "원본 좌표" |
 | MiniMaxH3AddGuide 계열 | 확인 필요 | frame_idx 가이드 | 미검증 | 조사 중 |
-| 다중 서브젝트 슬롯 임베딩(IC-LoRA) | LTX-2.x | 인물별 슬롯 | fp8-cast 필요 | 검증 후보 |
 
 > FL-Path의 121점 리샘플·정적 점 반복 아이디어는 **"앵커는 흔들리면 안 된다"**는 우리 요구와 정확히 같다.
 > 다만 이 노드는 *형체遮mask*를 만들 뿐 얼굴 정체성은 못 만든다 → SDXL LoRA와 조합해야 함.
@@ -120,6 +126,24 @@ Google DeepMind의 BlenderFusion(arXiv:2506.17450) 파이프라인에서 차용�
  PuLID/InstantID는 얼굴 고정 강도가 높지만 InsightFace(비상업) 의존 또는 라이선스 문제로 제외.
  학습 LoRA가 공개 비교에서 모든 지표 1위 → **LoRA를 정체성 원본으로 확정.**
 
+### 3.5 12GB 실행 구성 확정 (다운로드 진행 중)
+
+| 컴포넌트 | 파일 | 크기 | 설치 위치 |
+|---|---|---|---|
+| distilled DiT | `unsloth/LTX-2.5-GGUF` → `ltx-2.5-22b-distilled-UD-Q3_K_XL.gguf` | 12.00 GB | `models/unet/` |
+| 텍스트 인코더 | `elix3r/gemma4-12b-with-proj-ltx-2.5-GGUF` → `Q4_K_M.gguf` | 7.84 GB | `models/text_encoders/` |
+| 영상 VAE | `ltx-2.5-video-vae-conv-bf16.safetensors` | 1.35 GB | `models/vae/` |
+| 오디오 VAE | `ltx-2.5-audio-vae-bf16.safetensors` | 0.34 GB | `models/vae/` |
+| 공간 업스케일러 | `ltx-2.5-latent-spatial-upscaler-x2-bf16-1.0.safetensors` | 0.93 GB | `models/latent_upscale_models/` |
+| 레이아웃→실사 | `Lightricks/...Layout-To-Render...1.0.safetensors` | 1.22 GB | `models/loras/` |
+| 다중 참조 | `LTX-2.5-Licon-MSR-V2.safetensors` | 2.06 GB | `models/loras/` |
+| **합계** | | **≈ 25.7 GB** | 디스크 여유 302 GB ✅ |
+
+설치 스크립트: `tools/download_p2_models.ps1`, `tools/install_p2_nodes.ps1`.
+커스텀 노드 4종(ComfyUI-GGUF / ComfyUI-LTXVideo / ComfyUI-LTX2.5-MSR / ComfyUI_FL-Path-Animator) 설치 완료.
+
+> speed-down 대비: DiT를 `UD-Q2_K_XL`(9.5GB)로 교체하면 2.5GB 절약, 품질은 LPIPS 0.416으로 소폭 하락.
+
 ---
 
 ## 4. 추천 설계 — 5계층 Hybrid Identity-First
@@ -143,11 +167,12 @@ Google DeepMind의 BlenderFusion(arXiv:2506.17450) 파이프라인에서 차용�
    → 실사 키프레임 = LTX 앵커로 쓸 이미지
 
 [L3] LTX-2.5 영상화 + 프레임 앵커                    ← 사용자 제안 ①②
-   --image keyframe_0.png 0 1.0
-   --image anchor_face.png 24 0.7   (세그먼트 경계마다 얼굴 재앵커)
-   --image anchor_bg.png  48 0.5   (배경 고정)
-   + native multishot로 3씬 연결, fp8-cast + cpu offload
-   + FL-Path 앵커 마스크를 조건으로 주입(실험)
+   ComfyUI-GGUF: UD-Q3_K_XL DiT + Gemma4 Q4_K_M TE
+   + 공식 Layout-to-Render IC-LoRA(1.0) ← L1 클레이 영상이 구도 지배 (제안 ④의 완성)
+   + Licon MSR V2 ← 인물/소품/배경 최대 5개를 슬롯으로 핀 (제안 ①의 완성)
+   + --image first.png -1 1.0 / mid.png 36 1.0 / last.png 72 1.0  (화면 고정)
+   + native multishot로 3씬 연결, 1280×704 · 121프레임 · 24fps
+   + FL-Path 앵커 마스크는 실험 옵션
 
 [L4] 검증 — 얼굴 최우선
    face_identity.py로 매 씬 대표 프레임 측정 → 미달 시 FAIL
@@ -164,7 +189,8 @@ Google DeepMind의 BlenderFusion(arXiv:2506.17450) 파이프라인에서 차용�
 | L1 조건 출력 | depth/seg/bbox가 ControlNet과 LTX 조건의 입력 → Blender가 생성 모델을 "지배" | ④⑤ |
 | L2 LoRA 고정 | 시드마다 다른 얼굴이 나오던 문제가 사라짐. 후보 선택은 구도 기준으로 단순화 | ③ |
 | L2 ControlNet | 실사 키프레임도 L1 구도를 그대로 따름 → 키프레임과 영상 구도가 어긋나지 않음 | ③④ |
-| L3 멀티 앵커 | scene 2의 0.619→0.520 드리프트는 참조 희석. 경계마다 임베딩을 되돌려 억제 | ① |
+| L3 Layout-to-Render | Blender 클레이 영상이 카메라·사물 위치를 지배. 첫 프레임이 색·조명·재질을 지정 → **별도 ControlNet 학습 불필요** | ④⑤ |
+| L3 MSR V2 슬롯 | scene 2의 0.619→0.520 드리프트는 참조 희석. 참조를 슬롯으로 고정해 경계마다 되돌림 | ① |
 | L3 multishot | 컷을 넘어 정체성 유지. 기존 D63 참조 차단 문제를 모델 수준에서 해결 | ② |
 | L4 얼굴 게이트 | 사용자 육안 불만을 자동 검증 대상으로 승격 | 전체 |
 
@@ -192,7 +218,7 @@ Google DeepMind의 BlenderFusion(arXiv:2506.17450) 파이프라인에서 차용�
 | 2 | kohya_ss로 SDXL LoRA 학습 (dim32, ~1~2시간) | `models/lora/char_jun.safetensors` | ⏳ |
 | 3 | Blender 풀 3D 15초 프리비즈 + depth/seg/bbox/pose 내보내기 | `engine/layout3d.py` 확장, `p2-pilot/previs/` | ⏳ |
 | 4 | SDXL + ControlNet 실사 키프레임, 얼굴 게이트 적용 | `p2-pilot/keyframes/` | ⏳ |
-| 5 | LTX-2.5 fp8-cast + 멀티 앵커 I2V 프로토타입 (짧은 클립으로 속도 실측) | `engine/animate.py` | ⏳ |
+| 5 | LTX-2.5 GGUF + Layout-to-Render + MSR V2 프로토타입 (짧은 클립으로 속도 실측) | `engine/animate.py` | ⏳ |
 | 6 | 얼굴 게이트 `verify.py` 통합, 기존 파이프라인과 비교 | `p2-pilot/metrics.json` | ⏳ |
 
 > 기존 `guided-50`은 **보류 상태로 보존**. 재개 지시 전까지 기존 파이프라인을 수정하지 않는다.
@@ -208,7 +234,8 @@ Google DeepMind의 BlenderFusion(arXiv:2506.17450) 파이프라인에서 차용�
 | MPFB (Blender 플러그인) | GPLv3 | 플러그인 코드. 생성 결과물은 별도 |
 | OpenCV + YuNet/SFace | **Apache 2.0** | 얼굴 검출·인식, 설치 완료 |
 | ComfyUI_FL-Path-Animator | **MIT** | 앵커 마스크 생성기 |
-| **LTX-2.5 가중치** | **LTX-2.x Community License** | 연매출 $10M 미만 무료. 파인튜닝 이전은 유료 가능. `fp8-cast` 경로 |
+| **LTX-2.5 가중치 / GGUF / IC-LoRA** | **LTX-2.x Community License** | 연매출 $10M 미만 무료. 파인튜닝 이전은 유료 가능. **GGUF는 비공식 양자화 파생물이지만 동일 라이선스** |
+| Licon MSR V2 어댑터 | **Apache 2.0** | 다중 참조. 단, 기반 LTX 가중치는 위 라이선스 |
 | LTX-2 Apache Code | Apache 2.0 | 추론·학습 코드. 가중치는 별도 계약 |
 | SDXL / RealVisXL V5 | 기존 사용 중 | 계속 확인 필요 |
 | FLUX.2 klein 4B | Apache 2.0 | 13GB → 12GB에서 양자화 검토 (예비) |
@@ -225,12 +252,12 @@ Google DeepMind의 BlenderFusion(arXiv:2506.17450) 파이프라인에서 차용�
 
 | 항목 | 내용 | 대안 |
 |---|---|---|
-| **12GB + 22B 속도** | LTX-2.5 distilled도 fp8-cast+offload에서는 121프레임이 70분을 넘길 수 있음. **최대 리스크** | 49프레임 세그먼트 3개 + multishot, 또는 640×352 stage1 → x2 업스케일. 그래도 안 되면 SDXL+AnimateDiff 백업 경로 |
-| 텍스트 인코더 12B | Gemma4 12B도 VRAM에 올라가야 함. offload 전략 확인 필요 | ComfyUI int8-convrot 텍스트 인코더 경로 검토 |
+| **12GB + 22B 속도** | GGUF로 메모리는 해결됐지만 121프레임 2스테이지가 70분을 넘길 수 있음. **여전히 최대 리스크** | 49프레임 세그먼트 3개 + multishot, 또는 DiT를 `UD-Q2_K_XL`(9.5GB)로 교체. 그래도 안 되면 SDXL+AnimateDiff 백업 |
+| 텍스트 인코더 12B | GGUF Q4_K_M(7.8GB)로 다운로드·VRAM 해결. 로딩 후 CPU 오프로드 가능 | Q2_K(5.55GB)로 추가 절감 가능 |
 | 데이터셋 품질 | 3D 렌더가 실사와 거리가 있으면 LoRA가 3D 톤을 배움 | 렌더 재질·조명을 실사 키프레임 톤에 맞춤 |
 | LoRA 과적합 | 표정/각도 고정 → 자연스러움 저하 | dim 32 / 15 epoch / 다양한 각도 |
 | 세그먼트 앵커 이음새 | 앵커 재주입 경계에서 깜빡임 가능 | D72의 yavg_step_ratio로 모니터 |
-| 멀티 서브젝트 | IC-LoRA 슬롯 임베딩이 LTX-2.5에서 안정적인지 미검증 | 단일 인물 먼저 검증 후 확장 |
+| 멀티 서브젝트 | MSR V2(Apache 2.0)가 최대 5개 슬롯을 지원하지만 우리 장면에서의 안정성은 미검증 | 단일 인물 먼저 검증 후 2→5개로 확장 |
 | 측정 임계값 | SFace 0.36 = 타인 경계. 게이트 통과선 0.60으로 시작 | 파일럿 데이터로 보정 |
 | **육안 게이트** | 이 모델은 이미지를 직접 판정 못 함 | 최종 합격은 사용자가 눈으로 확인. 숫자 PASS만으로 통과 불가 원칙 유지 |
 
@@ -248,3 +275,8 @@ Google DeepMind의 BlenderFusion(arXiv:2506.17450) 파이프라인에서 차용�
 | VerseCrafter Blender 전처리 | https://github.com/TencentARC/VerseCrafter/blob/main/README_BLENDER.md |
 | POCI-Diff (3D bbox + 텍스트 바인딩) | https://arxiv.org/html/2601.14056v1 |
 | OpenCV Zoo YuNet / SFace | https://github.com/opencv/opencv_zoo |
+| LTX-2.5 GGUF (UD-Q3_K_XL 12GB, 1280×704 샘플) | https://huggingface.co/unsloth/LTX-2.5-GGUF |
+| Gemma4 12B GGUF 텍스트 인코더 | https://huggingface.co/elix3r/gemma4-12b-with-proj-ltx-2.5-GGUF |
+| **공식 Layout-to-Render IC-LoRA** | https://huggingface.co/Lightricks/LTX-2.5-22b-IC-LoRA-Layout-To-Render |
+| Licon MSR V2 (다중 참조, Apache 2.0) | https://huggingface.co/LiconStudio/LTX-2.5-Multiple-Subject-Reference |
+| ComfyUI-GGUF / ComfyUI-LTXVideo | https://github.com/city96/ComfyUI-GGUF · https://github.com/Lightricks/ComfyUI-LTXVideo |
