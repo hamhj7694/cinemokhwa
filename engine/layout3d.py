@@ -1,13 +1,14 @@
-"""D67 — 결정론적 3D 레이아웃 패스 (Blender 설치 없이도 동작).
+"""D67/D70 — 결정론적 3D 레이아웃 패스.
 
 사용자 아이디어 1("Blender로 빠르게 3D 구도")을 완전 무료·로컬로 실현한다.
 대본의 `anchors`/`visual`/`motion`에서 **같은 3D 좌표계**의 카메라·인물·배경을
-결정론적으로 배치하고, numpy+PIL로 블록아웃 PNG를 그린다.
+결정론적으로 배치하고 PNG로 굽는다.
 
-왜 소프트웨어 렌더인가
-  - Blender가 이 PC에 없다(2026-11-21 확인). 설치/다운로드 없이 바로 동작해야 한다.
-  - 목적은 "예쁜 3D"가 아니라 **구도 고정**이다. 선·실루엣만으로 충분하다.
-  - Blender가 생기면 `export_blender()`로 같은 Scene3D를 그대로 렌더할 수 있다.
+백엔드(D70)
+  - 기본: `blender` — 4.5.16 LTS headless로 같은 Scene3D를 실제 3D 렌더.
+    실측 라플라시안 5~15로 실사 키프레임에 선이 번지지 않는다.
+  - 대안: `cpu` — numpy+PIL 소프트웨어 블록아웃(라플라시안 445).
+    `CINEMOKHWA_LAYOUT_BACKEND=cpu`로 선택. 목적은 "예쁜 3D"가 아닌 구도 고정.
 
 실사 텍스처는 기존 SDXL/Wan 레이어가 담당한다(D68). 새 모델·유료 API 없다(D39/D47).
 """
@@ -347,10 +348,10 @@ def generate(
 
 
 def export_blender(s: Scene3D, dest: Path, width: int = 1280, height: int = 704) -> Path:
-    """같은 Scene3D를 Blender headless 스크립트로 내보낸다(설치 시 선택적 사용).
+    """같은 Scene3D를 Blender headless 스크립트로 내보낸다(D70).
 
-    사용법(Blender 설치 후): blender -b -P <dest> -- --out <png>
-    지금은 export만 하고 실행하지 않는다(Q9/설치 없음).
+    실제 실행은 `render_blender()`가 담당한다. 수동 실행 시:
+        blender -b -P <dest> -- <out.png>
     """
     payload = json.dumps(asdict(s), ensure_ascii=False, indent=2)
     code = f'''"""D67 — Blender 백엔드 (자동 생성). 필요한 경우에만 실행."""

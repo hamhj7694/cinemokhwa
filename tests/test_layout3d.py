@@ -106,4 +106,29 @@ assert k1 != k2
 assert abs(flow["5"]["inputs"]["denoise"] - Config().layout_denoise) < 1e-6
 print("PASS: IPAdapter(정체성) + 레이아웃 img2img(구도) 동시 주입 + 캐시키 반영")
 
+# 9) D70 설정 — Blender가 기본 백엔드이고 실행 파일이 실제로 존재
+cfg = Config()
+assert cfg.layout_backend == "blender", cfg.layout_backend
+assert cfg.blender_exe.exists(), cfg.blender_exe
+print("PASS: D70 기본 백엔드=blender · Blender 실행 파일 존재")
+
+# 10) 백엔드별 캐시키 분리 — CPU 도면과 Blender 도면이 섞이지 않아야 한다
+k_cpu = layout3d.stage_key(proj, SCENES[0], 0, backend="cpu")
+k_blender = layout3d.stage_key(proj, SCENES[0], 0, backend="blender")
+assert k_cpu != k_blender
+print("PASS: D70 백엔드별 캐시키 분리")
+
+# 11) generate() 디스패치 — blender면 render_blender 호출, cpu면 호출 안 함
+from unittest.mock import patch  # noqa: E402
+
+with patch.object(layout3d, "render_blender", return_value=root / "layouts" / "layout_01.png") as rb:
+    _, mb = layout3d.generate(proj, SCENES[0], sequence=0, width=320, height=176,
+                              force=True, backend="blender")
+assert rb.call_count == 1 and mb["backend"] == "blender"
+with patch.object(layout3d, "render_blender") as rb2:
+    _, mc = layout3d.generate(proj, SCENES[0], sequence=0, width=320, height=176,
+                              force=True, backend="cpu")
+assert rb2.call_count == 0 and mc["backend"] == "cpu"
+print("PASS: D70 generate() 백엔드 디스패치")
+
 print("\nALL PASS")
