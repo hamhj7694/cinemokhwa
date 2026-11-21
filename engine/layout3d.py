@@ -24,6 +24,7 @@ import numpy as np
 from PIL import Image, ImageDraw
 
 from . import project as project_mod
+from .config import Config
 
 WIDE = re.compile(
     r"\b(wide|long shot|extreme wide|establishing|from behind|behind (?:him|her)|"
@@ -271,8 +272,8 @@ def layout_path(project: project_mod.Project, scene_id: int) -> Path:
     return project.dir / "layouts" / f"layout_{int(scene_id):02d}.png"
 
 
-def stage_key(project: project_mod.Project, scene: dict, sequence: int = 0) -> str:
-    """레이아웃 캐시키. 대본 문구·인물/장소·순서가 바뀌면 다시 그린다."""
+def stage_key(project: project_mod.Project, scene: dict, sequence: int = 0, backend: str = "cpu") -> str:
+    """레이아웃 캐시키. 대본 문구·인물/장소·순서·렌더 백엔드가 바뀌면 다시 그린다."""
     s = build_scene(project, scene, sequence)
     return project_mod.digest(
         {
@@ -282,8 +283,38 @@ def stage_key(project: project_mod.Project, scene: dict, sequence: int = 0) -> s
             "figures": [asdict(f) for f in s.figures],
             "blocks": [asdict(b) for b in s.blocks],
             "render_version": 2,  # 그리드/라벨 제거 반영 — 이전 캐시 무효화
+            "backend": backend,   # D70: CPU 블록아웃 vs Blender 렌더 캐시 분리
         }
     )
+
+
+def render_blender(
+    s: Scene3D,
+    dest: Path,
+    width: int = 1280,
+    height: int = 704,
+    blender_exe: Path | None = None,
+) -> Path:
+    """같은 Scene3D를 Blender headless로 렌더해 PNG로 저장(D70).
+
+    CPU 블록아웃 대비 고주파 선이 거의 없어(실측 lap 15 vs 445) 실사
+    키프레임 잠재에 번지지 않는다. 1씬 약 23초(CPU, 64 samples).
+    """
+    import subprocess
+    import tempfile
+
+    exe = Path(blender_exe) if blender_exe else Config().blender_exe
+    if not exe.exists():
+        raise FileNotFoundError(f"Blender 실행 파일 없음: {exe}")
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory() as td:
+        script = export_blender(s, Path(td) / "scene.py", width, height)
+        cmd = [str(exe), "-b", "-P", str(script), "--", str(dest)]
+        r = subprocess.run(cmd, capture_output=True, text=True,
+                           encoding="utf-8", errors="replace", timeout=300)
+        if r.returncode != 0 or not dest.exists():
+            raise RuntimeError(f"Blender 렌더 실패({r.returncode}): {r.stderr[-500:]}")
+    return dest
 
 
 def generate(
@@ -294,19 +325,24 @@ def generate(
     width: int = 1280,
     height: int = 704,
     force: bool = False,
+    backend: str = "cpu",
+    blender_exe: Path | None = None,
 ) -> tuple[Path, dict]:
-    """(경로, 메타). 캐시 있으면 재사용."""
+    """(경로, 메타). 캐시 있으면 재사용. backend='blender'면 실제 3D 렌더(D70)."""
     dest = layout_path(project, scene["id"])
-    key = stage_key(project, scene, sequence)
+    key = stage_key(project, scene, sequence, backend=backend)
+    s = build_scene(project, scene, sequence)
     meta = {
         "file": dest.name, "key": key,
-        "features": build_scene(project, scene, sequence).features,
+        "features": s.features, "backend": backend,
     }
     if dest.exists() and not force:
         return dest, {**meta, "cached": True}
-    img = render(build_scene(project, scene, sequence), width, height)
     dest.parent.mkdir(parents=True, exist_ok=True)
-    img.save(dest)
+    if backend == "blender":
+        render_blender(s, dest, width, height, blender_exe=blender_exe)
+    else:
+        render(s, width, height).save(dest)
     return dest, meta
 
 

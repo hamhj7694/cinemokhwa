@@ -148,11 +148,12 @@ def run_pipeline(
             say("      인물 없음 — 카드 생성 생략")
     comfy.free_memory()
 
-    # 3. 3D 레이아웃 (D67) -------------------------------------------------
-    step(3, total, "3D 레이아웃 (결정론적 구도 · 블록아웃)")
+    # 3. 3D 레이아웃 (D67/D70) ---------------------------------------------
+    backend = cfg.layout_backend
+    step(3, total, f"3D 레이아웃 (결정론적 구도 · {backend} 백엔드)")
     lkey = project_mod.digest(
-        {"stage": "layout", "keys": [
-            layout3d.stage_key(project, s, i)
+        {"stage": "layout", "backend": backend, "keys": [
+            layout3d.stage_key(project, s, i, backend=backend)
             for i, s in enumerate(project.scenes())
         ]}
     )
@@ -169,11 +170,12 @@ def run_pipeline(
             p, meta = layout3d.generate(
                 project, s, sequence=i,
                 width=cfg.width, height=cfg.height, force=force,
+                backend=backend, blender_exe=cfg.blender_exe if backend == "blender" else None,
             )
             linfo.append({"scene": s["id"], **meta})
         project.finish("layout", lkey, seconds=round(time.time() - t, 1), items=linfo)
         project.log_line(f"layout ok {time.time() - t:.1f}s")
-        say(f"      완료 — {len(linfo)}장 ({human(time.time() - t)}) · CPU만 사용")
+        say(f"      완료 — {len(linfo)}장 ({human(time.time() - t)}) · {backend} 백엔드")
 
     # 4. 키프레임 ---------------------------------------------------------
     step(4, total, "키프레임 (SDXL 4시드 → 중앙 선명도 최고 · 3D 구도 주입)")

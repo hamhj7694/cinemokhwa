@@ -61,6 +61,18 @@ class Config:
         default_factory=lambda: float(os.environ.get("CINEMOKHWA_LAYOUT_DENOISE", "0.70"))
     )
 
+    # --- D70 Blender 백엔드 (2026-11-21 설치) ---
+    # 무료 GPL · 로컬 headless 렌더. CPU 블록아웃보다 고주파 선이 적어
+    # 실사 키프레임에 번지지 않는다. CINEMOKHWA_LAYOUT_BACKEND=blender|cpu
+    layout_backend: str = field(
+        default_factory=lambda: os.environ.get("CINEMOKHWA_LAYOUT_BACKEND", "blender").strip().lower()
+    )
+    blender_exe: Path = field(
+        default_factory=lambda: Path(
+            os.environ.get("CINEMOKHWA_BLENDER") or r"C:\Users\mbc\mokhwa\apps\blender-4.5.16-windows-x64\blender.exe"
+        )
+    )
+
     # --- 모델 파일명 (ENVIRONMENT §3.1) ---
     sdxl_ckpt: str = "RealVisXL_V5.0_fp16.safetensors"
     wan_unet: str = "wan2.2_ti2v_5B_fp16.safetensors"
