@@ -191,7 +191,7 @@ def build_workflow(
             "inputs": {"pixels": ["21", 0], "vae": ["1", 2]},
         }
         latent = ["22", 0]
-        denoise = cfg.img2img_denoise
+        denoise = cfg.layout_denoise
 
     flow["4"] = {
         "class_type": "EmptyLatentImage",
@@ -275,7 +275,8 @@ def generate(
 ) -> tuple[Path, dict]:
     """SDXL 4시드 → 최고 1장. `reference`=정체성(D66), `layout`=3D 구도(D67)."""
     if cfg.kf_reference not in ("ipadapter", "img2img"):
-        reference, reference_label = None, ""   # CINEMOKHWA_KF_REF=none
+        # CINEMOKHWA_KF_REF=none 이면 정체성·구도 참조 모두 끈다(깨끗한 기준선).
+        reference, reference_label, layout = None, "", None
     dest = project.keyframe_path(scene["id"])
     if dest.exists() and not force:
         return dest, {

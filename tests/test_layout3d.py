@@ -103,6 +103,7 @@ assert flow["5"]["inputs"]["latent_image"] == ["22", 0]  # 구도 = 레이아웃
 k1 = keyframe.stage_key(Config(), proj, SCENES[0], ref_card="char:jun", layout_digest="aaa")
 k2 = keyframe.stage_key(Config(), proj, SCENES[0], ref_card="char:jun", layout_digest="bbb")
 assert k1 != k2
+assert abs(flow["5"]["inputs"]["denoise"] - Config().layout_denoise) < 1e-6
 print("PASS: IPAdapter(정체성) + 레이아웃 img2img(구도) 동시 주입 + 캐시키 반영")
 
 print("\nALL PASS")
