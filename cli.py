@@ -220,7 +220,13 @@ def run_pipeline(
                 if refs[int(s["id"])] and refs[int(s["id"])]["kind"] == "card"
                 else None
             ),
-            layout_digest=project_mod.file_digest(layout3d.layout_path(project, s["id"])),
+            # D63: 같은 shot의 연장은 앞 클립을 픽셀 체이닝하므로 새 레이아웃을 주입하지 않는다.
+            # 레이아웃을 넣으면 체이닝 구도가 흔들려 선명도가 떨어진다(guided-20 scene 2 ratio 0.636).
+            layout_digest=(
+                "none"
+                if chain_of.get(int(s["id"])) is not None
+                else project_mod.file_digest(layout3d.layout_path(project, s["id"]))
+            ),
         )
         for s in scenes
     ]
@@ -244,10 +250,13 @@ def run_pipeline(
                     else:
                         ref = keyframe.reference_path(project, info_ref["target"])
                         ref_label = info_ref["label"]
+                # D63 보강: 연장 씬은 레이아웃 주입 없이 앞 클립 체이닝에 맡긴다.
+                # guided-20 실측 — 연장에 레이아웃을 넣은 scene 2만 선명도 FAIL(0.636).
+                layout_path = None if chain_of.get(int(s["id"])) is not None else layout3d.layout_path(project, s["id"])
                 path, info = keyframe.generate(
                     cfg, comfy, project, s,
                     reference=ref, reference_label=ref_label,
-                    layout=layout3d.layout_path(project, s["id"]),
+                    layout=layout_path,
                     force=force or key_changed,
                 )
                 meta.append({"scene": s["id"], **info})
