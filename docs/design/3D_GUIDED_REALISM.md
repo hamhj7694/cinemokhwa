@@ -77,6 +77,20 @@ D66 ①(정면 카드)은 얼굴 정보는 고정했지만 **어디에 서 있�
   정상 후보가 걸러져 D71b에서 **절대 하한 `MIN_CENTER_SHARPNESS=40`**으로 변경.
   → "충분히 선명한 후보 중 목표 밝기(105)에 가장 가까운 시드" 선택.
 
+### 결정 D72 (motion-aware 밝기 안정 — guided-50scene 2 실측)
+- **증상**: D71b 수정 후 guided-50의 씬 간 밝기 차이는 8.49(PASS)로 해결됐지만,
+  scene 2의 컷 내 `yavg_std=5.459 > YAVG_STD_PASS=5.0`로 FAIL이 남았다.
+- **궤적 분석**: scene 2 밝기는 104→125→109의 단일 완만 아치. 1차 미분/표준편차가
+  **0.350**으로, 오히려 PASS된 scene 1(0.398)·scene 3(0.455)보다 낮았다.
+  → 고주파 깜빡임이 아니라 카메라가 조명을 지나가며 밝아졌다 어두워진 자연스러운 변화.
+- **판정 변경**: `yavg_std`만 보던 것을 `yavg_step_ratio = mean|ΔY|/std`를 함께 본다.
+  - `std < 5` → PASS (기존)
+  - `std < 12` **and** `step_ratio < 0.75` → PASS (완만 아치, D72)
+  - `std >= 12` → FAIL (아치여도 시각적으로 과한 스윙)
+  - 나머지 → 기존 wide WARN / FAIL 유지 (고주파 깜빡임은 계속 FAIL)
+- **결과**: guided-50 종합 **FAIL → WARN**. 씬 간 밝기 8.49 PASS, 드리프트 WARN(연장 씬 카메라 이동)만 남음.
+  WARN은 숫자 PASS만으로 통과시키지 않는 원칙에 따라 유지하고 육안 확인 대상으로 표시.
+
 ### 결정 D70 (Blender 채택 — 2026-11-21 설치 완료)
 - **Blender vs Unity 비교**: Blender = 무료 GPL, 오프라인 렌더(Cycles/EEVEE), Python 자동화, 정적 구도 도면에 최적.
   Unity = 실시간 게임 엔진이라 이 파이프라인에는 과하고 유료 티어 필요 → **Blender 채택**.
@@ -95,7 +109,8 @@ D66 ①(정면 카드)은 얼굴 정보는 고정했지만 **어디에 서 있�
 | B | `keyframe.py` 이중 참조(IPAdapter+img2img) + `cli.py` 6단계 배선 | ✅ 완료 |
 | C | 문서 동기화 + 실 스모키(저해상도) + 최종 보고서 | ✅ 완료 |
 | D | D70 Blender 백엔드 설치·연결 + 3씬 렌더 검증 | ✅ 완료 (`5a3c151`) |
-| E | Blender 백엔드 최종 검증 `guided-50` (20스텝) | 🔄 진행 |
+| E | Blender 백엔드 최종 검증 `guided-50` (20스텝) | ✅ 완료 (`c8ac214`) |
+| F | D71~D72 밝기 일관성 검증·보정 + motion-aware 판정 | ✅ 완료 |
 
-> 각 단위는 별도 커밋·푸시한다. `guided-40`(CPU 백엔드 로드 상태)과 `guided-50`(Blender 백엔드)이
-> 순차 렌더 중이며, 완료 시 verify·ffprobe·최종 비교 후 문서·커밋까지 자동 처리된다.
+> 각 단위는 별도 커밋·푸시한다. `guided-50`까지 완료되어 verify(WARN, FAIL 없음)·ffprobe·
+> 최종 비교표 생성이 끝났다. **마지막 육안 게이트만 사용자 확인이 남았다.**

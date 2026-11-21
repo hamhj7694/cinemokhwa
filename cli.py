@@ -578,6 +578,14 @@ def cmd_verify(args: argparse.Namespace) -> int:
             f"{ssim:>6} {pal:>6} {row['end_drift']:>8.1f}  {mark} {row['verdict']}"
             + ("   (wide)" if row["wide_shot"] else ""))
 
+    # D72: std는 높은데 완만 아치로 PASS된 씬은 근거를 함께 표시한다.
+    smooth = [r for r in result["clips"]
+              if r["yavg_std"] >= verify.YAVG_STD_PASS
+              and r["verdicts"].get("밝기 안정") == "PASS"]
+    for r in smooth:
+        say(f"  장면 {r['scene']:02d}: 밝기 std {r['yavg_std']:.2f} · "
+            f"step/std {r['yavg_step_ratio']:.2f} → 완만한 조명 아치로 PASS (D72)")
+
     notes = [(r["scene"], k, v) for r in result["clips"]
              for k, v in r["verdicts"].items() if v != "PASS"]
     if notes:

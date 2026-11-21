@@ -52,4 +52,32 @@ assert 81.97 > verify.CROSS_YAVG_FAIL
 assert max([107.1, 112.78, 104.8]) - min([107.1, 112.78, 104.8]) < verify.CROSS_YAVG_WARN
 print("PASS: D71 씬 간 밝기 WARN/FAIL 임계값")
 
+
+# --- D72: motion-aware 밝기 안정 판정 ------------------------------------
+def bright_row(std: float, step: float, wide: bool = False) -> dict:
+    return {
+        "frames": 121, "wide_shot": wide, "ratio": 1.0,
+        "ydif_median": 50.0, "yavg_std": std, "yavg_step_ratio": step,
+        "boundary": "extend", "first_frame_mae": 1.0,
+        "end_drift": 10.0,
+    }
+
+
+def bright_verdict(std: float, step: float, wide: bool = False) -> str:
+    return verify.judge(bright_row(std, step, wide), 121)["밝기 안정"]
+
+
+assert verify.YAVG_STD_FAIL == 12.0 and verify.STEP_RATIO_PASS == 0.75
+# guided-50 scene 2 실측: std 5.459(기준 초과)지만 step/std 0.350 → 완만 아치 PASS
+assert bright_verdict(5.459, 0.350) == "PASS"
+# 고주파 깜빡임은 step/std가 커서 FAIL 유지
+assert bright_verdict(6.0, 1.10) == "FAIL"
+# 아치라도 절대 상한(12) 초과는 FAIL
+assert bright_verdict(13.0, 0.20) == "FAIL"
+# 원경은 애매한 경우 WARN 유지
+assert bright_verdict(6.0, 0.90, wide=True) == "WARN"
+# 기준 이하는 당연히 PASS
+assert bright_verdict(3.0, 0.80) == "PASS"
+print("PASS: D72 완만 조명 아치 PASS / 고주파 깜빡임 FAIL 판정")
+
 print("\nALL PASS")

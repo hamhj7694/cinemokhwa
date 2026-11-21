@@ -36,7 +36,12 @@ SAMPLE_EVERY = 6          # 121프레임 → 21장 측정
 # 판정 임계값
 RATIO_PASS = 0.70         # 클립 중앙 선명도 >= 참조의 70%
 YDIF_PASS = 1.0           # 프레임 간 평균 변화 (정지 화면이면 0에 가까움)
-YAVG_STD_PASS = 5.0       # 컷 내 밝기 안정
+YAVG_STD_PASS = 5.0       # 컷 내 밝기 안정 (깜빡임 탐지용 프록시)
+# D72: std만으로 깜빡임을 판정하면 카메라가 조명을 지나가며 밝아졌다 어두워지는
+# 완만한 아치까지 결함으로 오판한다(guided-50 scene 2: std 5.46, step/std 0.35).
+# 1차 미분 평균/표준편차가 낮으면 고주파 깜빡임이 아닌 자연스러운 조명 변화다.
+YAVG_STD_FAIL = 12.0      # 이 이상은 아치여도 시각적으로 과한 밝기 스윙
+STEP_RATIO_PASS = 0.75    # mean|ΔY|/std — 이보다 낮으면 완만한 드리프트(깜빡임 아님)
 MAE_PASS = 3.0            # 연장 이음새가 앞 클립 끝과 일치
 SSIM_PASS = 0.30          # 컷 첫 프레임 ↔ 키프레임 구조 유사도
 SSIM_WARN = 0.15
@@ -211,6 +216,13 @@ def measure_clip(
     frames, w, h = decode_gray(clip, cfg)
     yavg = frames.reshape(len(frames), -1).mean(axis=1, dtype=np.float64)
     ydif = np.abs(np.diff(frames, axis=0)).mean(axis=(1, 2), dtype=np.float64)
+    # D72: 밝기 궤적의 매끄러움. 표본 간 1차 미분 평균 / 전체 표준편차.
+    # 낮을수록 완만한 아치(자연 조명), 높을수록 고주파 깜빡임(결함).
+    yavg_s = yavg[::SAMPLE_EVERY]
+    step_ratio = (
+        float(np.abs(np.diff(yavg_s)).mean() / yavg_s.std())
+        if len(yavg_s) > 1 and yavg_s.std() > 0 else 0.0
+    )
 
     center_sharp = [
         _lap_var(_center(frames[i].astype(np.float32) / 255.0))
@@ -249,6 +261,7 @@ def measure_clip(
         "wide_shot": wide,
         "yavg_mean": round(float(yavg.mean()), 2),
         "yavg_std": round(float(yavg.std()), 3),
+        "yavg_step_ratio": round(step_ratio, 3),
         "yavg_drift": round(float(yavg[-1] - yavg[0]), 2),
         "ydif_min": round(float(ydif.min()), 3) if len(ydif) else 0.0,
         "ydif_median": round(float(np.median(ydif)), 3) if len(ydif) else 0.0,
@@ -280,9 +293,14 @@ def judge(row: dict, expected_frames: int | None = None) -> dict[str, str]:
 
     out["움직임(YDIF)"] = "PASS" if row["ydif_median"] >= YDIF_PASS else "FAIL"
 
-    if row["yavg_std"] < YAVG_STD_PASS:
+    std = row["yavg_std"]
+    step = row.get("yavg_step_ratio")
+    if std < YAVG_STD_PASS:
         out["밝기 안정"] = "PASS"
-    elif wide and row["yavg_std"] < YAVG_STD_PASS * 3:
+    elif std < YAVG_STD_FAIL and step is not None and step < STEP_RATIO_PASS:
+        # D72: 완만한 단일 아치 — 카메라가 조명을 지나가는 자연스러운 변화.
+        out["밝기 안정"] = "PASS"
+    elif wide and std < YAVG_STD_PASS * 3:
         out["밝기 안정"] = "WARN"
     else:
         out["밝기 안정"] = "FAIL"

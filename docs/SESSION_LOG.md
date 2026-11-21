@@ -24,6 +24,10 @@
 | 4 | D67~D69 기획 + 3D 레이아웃 엔진 | `3D_GUIDED_REALISM.md`, `layout3d.py`, `tests/test_layout3d.py`, DESIGN D67~D69 | `7f0e45f` | feature/3d-guided-realism | ✅ |
 | 5 | D68 이중 참조 + 6단계 | `keyframe.py` IPAdapter+img2img 동시, `project.py` 6단계, `cli.py` 배선, 테스트 | `dcf4a46` | feature/3d-guided-realism | ✅ |
 | 6 | 조명·연장 수정 + D70 Blender | `prompt_for()` 조명 고정(`5d61132`) → 연장 씬 레이아웃 미주입(`30efa2a`) → Blender 4.5.16 설치·`render_blender()` 연결(`5a3c151`) | `5a3c151` | main | ✅ |
+| 7 | 육안 비교표 생성기 | `tools/contact_sheet.py` — run별 대표 프레임 4셀 그리드 PNG | `13399a3` | main | ✅ |
+| 8 | D71 씬 간 밝기 검증 | `verify.py` CROSS_YAVG_WARN=25/FAIL=50, `keyframe.py` 밝기 기준 선택, 회귀 테스트 | `5e6889d` | main | ✅ |
+| 9 | D71b 절대 선명도 하한 | 상대 60% → `MIN_CENTER_SHARPNESS=40`,guided-50 재시작 | `7f2de01` | main | ✅ |
+| 10 | D71b 조기 경고 + D72 | `cli.py` 밝기 조기 경고(`c3b2161`), verify motion-aware step/std 판정, guided-50 검증 완료 | (이번 커밋) | main | ✅ |
 
 main 푸시 범위: `482f99e..36677de`. feature 브랜치는 `origin/feature/3d-guided-realism` 추적 중.
 
@@ -31,9 +35,8 @@ main 푸시 범위: `482f99e..36677de`. feature 브랜치는 `origin/feature/3d-
 
 | 항목 | 상태 | 다음 |
 |---|---|---|
-| `identity-01` 재개 | scene 1 클립 캐시, scene 2부터 재생성 중 (ComfyUI 재기동 완료) | 완료 시 verify + ffprobe + WORKLOG 실측 |
-| 3D 가이드 실 스모키 | 코드·오프라인 테스트 완료. `guided-01`(832×480/6스텝/이중 참조 전체 영상)이 `identity-01` 종료 후 자동 실행 대기 중 | 저해상도 3씬 영상 확인 → main 병합 |
-| 최종 육안 판정 | 사용자 차례 | `identity-01/final.mp4` 경로 안내 예정 |
+| 최종 육안 판정 | **사용자 차례** — 자동 검증은 FAIL 해소(WARN). 비교표 `C:\Users\mbc\mokhwa\work\contact_compare.png` | `guided-50/final.mp4`를 ①~④와 비교해 귀속 확인 |
+| (선택) scene 2 드리프트 WARN | 연장 씬 카메라 이동에 따른 자연 변화로 판단, WARN 유지 | 육안으로 이질감 있으면 scene 2만 `--force` 재생성 |
 
 ### 중요 판단 근거
 
@@ -46,11 +49,15 @@ main 푸시 범위: `482f99e..36677de`. feature 브랜치는 `origin/feature/3d-
 | Blender 미설치 → 소프트웨어 렌더 (D67 초기) | 당시 설치 없이 즉시 동작해야 했고 목적은 "예쁜 3D"가 아닌 **구도 고정**이었음. 이후 D70에서 실제 Blender 설치·기본 백엔드화 |
 | Blender 채택 (D70) | Unity는 실시간 게임 엔진이라 정적 구도 도면에 과함. Blender는 무료 GPL·오프라인 렌더·Python 자동화. 사용자가 "가능하면 Blender 쓰면 좋겠다"고 명시 |
 | 아이디어 3 보류 (D69/Q9 종결) | Hunyuan3D 2.1은 한국이 라이선스 지역에서 제외, TRELLIS.2는 MIT지만 의존성 비상업용+24GB VRAM → 부적합 판정. Blender 도면 방식 유지 |
+| D71 씬 간 밝기 검사 | 개별 클립 PASS여도 Yavg 34/35/116(차이 81.97)이면 "다른 공간"처럼 보임. 컷 내 std만으로는 못 잡으므로 run 전체 max-min 검사 추가 |
+| D71b 절대 선명도 하한 | 어두운 그림이 라플라시안 분산이 인위적으로 커서 "선명도 최고"가 암부를 선택(Y112/lap52가 Y35/lap174에 밀림). 상대 60%도 부족해 절대 하한 40 적용 |
+| D72 motion-aware 밝기 판정 | guided-50 scene2는 std 5.46이지만 step/std 0.35의 단일 아치(103→125→109) = 자연 조명 통과. 깜빡임은 step/std가 커서 계속 FAIL. WARN은 육안 게이트용으로 유지 |
 
 ### 미해결 / 주의
 
 - Q9 조사 완료·종결 — Hunyuan3D(한국 제외)/TRELLIS.2(의존성 제약) 모두 부적합. 정교 3D 모델 설치 안 함.
-- `guided-40`(조명+연장 수정, CPU 로드) → `guided-50`(Blender 백엔드) 순차 렌더 중. 완료 시 verify·비교·문서·커밋 자동 처리.
+- `guided-40`은 씬 간 밝기 차이 81.97로 FAIL, `guided-50`은 D71b+D72 적용으로 **WARN(FAIL 없음)** 완료. auto 검증 종료.
+- D72: scene 2 std 5.46이지만 step/std 0.35 완만 아치 → PASS. 고주파 깜빡임은 계속 FAIL. 숫자 PASS만으로 통과 불가 원칙 유지.
 - 사용자 지시: 중간 확인 없이 멈추지 말고 계속 진행. 설치 필요 시 묻지 말고 바로 설치.
 - 이 모델은 이미지 입력을 못 읽음 → 카드/키프레임/영상 육안 판정은 사용자만 가능.
 - ComfyUI 출력에 이전 시도 프레임 누적 주의. 재개 전 `identity-01`의 scene 02 잔여 프레임은 0개로 확인됨.
@@ -90,5 +97,9 @@ main 푸시 범위: `482f99e..36677de`. feature 브랜치는 `origin/feature/3d-
 - [x] ComfyUI 실 스모키(`guided-01`) — 이중 참조 주입 로그 확인, main 병합 완료(`a346321`)
 - [x] `identity-01` 완료 → verify 종합 WARN(FAIL 없음) → WORKLOG 실측 입력
 - [x] 레이아웃 라벨 번짐 진단·수정(`ff7031a`) — guided-20은 수정 코드로 재대기
-- [ ] `guided-01` 완료 → verify → WORKLOG 입력
-- [ ] `guided-20`(20스텝/수정 도면) 완료 → **사용자 최종 육안 판정**
+- [x] `guided-01` 완료 → verify → WORKLOG 입력
+- [x] `guided-20`(20스텝/수정 도면) 완료 → WORKLOG 입력
+- [x] `guided-40`(조명+연장 수정) 완료 → 밝기 FAIL 정정, D71/D71b 원인 분석
+- [x] `guided-50`(Blender 3D + D71b) 완료 → verify WARN(FAIL 없음), Blender 3장 확인
+- [x] D72 motion-aware 밝기 판정 + 오프라인 테스트 6개 ALL PASS
+- [ ] **최종 육안 판정 (사용자 차례)** — `guided-50/final.mp4` + `contact_compare.png`
