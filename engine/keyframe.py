@@ -26,18 +26,21 @@ _REGION = 0.4
 # P0/guided-20 실측 정상 노출(~105)을 기준으로, 충분히 선명한 후보 중
 # 목표 밝기에 가장 가까운 것을 고른다.
 TARGET_YAVG = 105.0
-SHARP_POOL_RATIO = 0.60   # 최고 중앙 선명도의 60% 이상만 후보 유지
+# "최고 대비 60%" 같은 상대 기준은 쓰지 않는다. 어두운 이미지가 라플라시안
+# 분산이 인위적으로 커져(guided-40 scene1: Y35/lap174 vs Y112/lap52) 어두운
+# 시드를 계속 뽑는 편향이 생긴다. P0 정상 키프레임(lap 48~72) 기준의 절대 하한.
+MIN_CENTER_SHARPNESS = 40.0
 
 
 def choose_candidate(candidates: list[dict]) -> dict:
-    """D71 — 충분히 선명한 후보 중 목표 밝기에 가장 가까운 시드를 고른다.
+    """D71 — 절대 선명도 하한을 넘은 후보 중 목표 밝기에 가장 가까운 시드를 고른다.
 
-    선명도만 보면 4시드 중 유난히 어두운 것이 선택되는 경우가 있어
-    씬 간 밝기가 갈린다(guided-40 실측 Yavg 34/35/116).
+    guided-40 실측: scene 1의 Y112/lap52(정상) 후보가 Y35/lap174(암부)에
+    밀려 선택되면서 씬 간 밝기가 81.97이나 갈렸다. 상대 기준이 아닌
+    절대 하한을 써서 밝은 후보가 후보군에 남도록 한다.
     """
     assert candidates
-    max_center = max(c["center"] for c in candidates)
-    pool = [c for c in candidates if c["center"] >= max_center * SHARP_POOL_RATIO] or candidates
+    pool = [c for c in candidates if c["center"] >= MIN_CENTER_SHARPNESS] or candidates
     return min(pool, key=lambda c: (abs(c["yavg"] - TARGET_YAVG), -c["center"]))
 
 
@@ -289,7 +292,7 @@ def stage_key(
             "visual": scene["visual"],
             "anchors": anchor_text(project.bible(), list(scene.get("anchors") or [])),
             "seeds": SEEDS,
-            "selection_version": "d71-brightness",  # 후보 선택 로직 변경 시 캐시 무효화
+            "selection_version": "d71b-absolute-sharpness",  # 후보 선택 로직 변경 시 캐시 무효화
             "steps": cfg.keyframe_steps,
             "size": [cfg.width, cfg.height],
             "style": project.style,
