@@ -23,6 +23,7 @@
 | 3 | Figma 재개 문서 | 기존 미추적 2파일 추가 | `36677de` | main | ✅ |
 | 4 | D67~D69 기획 + 3D 레이아웃 엔진 | `3D_GUIDED_REALISM.md`, `layout3d.py`, `tests/test_layout3d.py`, DESIGN D67~D69 | `7f0e45f` | feature/3d-guided-realism | ✅ |
 | 5 | D68 이중 참조 + 6단계 | `keyframe.py` IPAdapter+img2img 동시, `project.py` 6단계, `cli.py` 배선, 테스트 | `dcf4a46` | feature/3d-guided-realism | ✅ |
+| 6 | 조명·연장 수정 + D70 Blender | `prompt_for()` 조명 고정(`5d61132`) → 연장 씬 레이아웃 미주입(`30efa2a`) → Blender 4.5.16 설치·`render_blender()` 연결(`5a3c151`) | `5a3c151` | main | ✅ |
 
 main 푸시 범위: `482f99e..36677de`. feature 브랜치는 `origin/feature/3d-guided-realism` 추적 중.
 
@@ -42,12 +43,15 @@ main 푸시 범위: `482f99e..36677de`. feature 브랜치는 `origin/feature/3d-
 | P1-16 연장 기준 | 같은 shot은 시작점이 앞 클립 마지막 프레임 → 자기 키프레임 비교는 오판(MAE 40.19) |
 | 커밋 분리 | `cli.py`가 두 기능에 걸려 카드 엔진 → `cli.py`+`verify.py` 순으로 분리해 기능 단위 유지 |
 | 신규 작업 브랜치 | 기존 main 커밋 보존 요청에 따라 3D 기획은 `feature/3d-guided-realism`에서 진행 |
-| Blender 미설치 → 소프트웨어 렌더 | 2026-11-21 확인. 설치 없이 즉시 동작해야 하고 목적은 "예쁜 3D"가 아닌 **구도 고정** |
-| 아이디어 3 보류 | TRELLIS.2/Hunyuan3D는 Q9(라이선스 확인 전 설치 금지). 기록 + Blender export 경로만 |
+| Blender 미설치 → 소프트웨어 렌더 (D67 초기) | 당시 설치 없이 즉시 동작해야 했고 목적은 "예쁜 3D"가 아닌 **구도 고정**이었음. 이후 D70에서 실제 Blender 설치·기본 백엔드화 |
+| Blender 채택 (D70) | Unity는 실시간 게임 엔진이라 정적 구도 도면에 과함. Blender는 무료 GPL·오프라인 렌더·Python 자동화. 사용자가 "가능하면 Blender 쓰면 좋겠다"고 명시 |
+| 아이디어 3 보류 (D69/Q9 종결) | Hunyuan3D 2.1은 한국이 라이선스 지역에서 제외, TRELLIS.2는 MIT지만 의존성 비상업용+24GB VRAM → 부적합 판정. Blender 도면 방식 유지 |
 
 ### 미해결 / 주의
 
-- Q9 유지 — 정교 3D 모델 설치 금지.
+- Q9 조사 완료·종결 — Hunyuan3D(한국 제외)/TRELLIS.2(의존성 제약) 모두 부적합. 정교 3D 모델 설치 안 함.
+- `guided-40`(조명+연장 수정, CPU 로드) → `guided-50`(Blender 백엔드) 순차 렌더 중. 완료 시 verify·비교·문서·커밋 자동 처리.
+- 사용자 지시: 중간 확인 없이 멈추지 말고 계속 진행. 설치 필요 시 묻지 말고 바로 설치.
 - 이 모델은 이미지 입력을 못 읽음 → 카드/키프레임/영상 육안 판정은 사용자만 가능.
 - ComfyUI 출력에 이전 시도 프레임 누적 주의. 재개 전 `identity-01`의 scene 02 잔여 프레임은 0개로 확인됨.
 - `test_layout3d.py`의 `Config()` 사용은 모델 로드를 하지 않는 순수 워크플로 검증임.

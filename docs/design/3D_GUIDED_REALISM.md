@@ -9,9 +9,9 @@
 
 | # | 아이디어 (사용자 원문 요약) | 기록 | 판단 |
 |---|---|---|---|
-| 1 | 실사 영상을 **Blender로 빠르게 3D 구도**를 잡아 영상화하고, 그 위에 **고품질 실사 배경·인물·소품**을 올려 영상화. 입력(레퍼런스/첫 프레임/텍스트/목소리)을 모두 참고해 Blender로 3D 배치 후 실사화 | ✅ | **1순위 채택** — 구도·인물 위치가 결정적이라 컷 간 일관성 문제를 근본적으로 푼다 |
+| 1 | 실사 영상을 **Blender로 빠르게 3D 구도**를 잡아 영상화하고, 그 위에 **고품질 실사 배경·인물·소품**을 올려 영상화. 입력(레퍼런스/첫 프레임/텍스트/목소리)을 모두 참고해 Blender로 3D 배치 후 실사화 | ✅ | **1순위 채택 + 실제 Blender 설치 완료(D70)** — 구도·인물 위치가 결정적이라 컷 간 일관성 문제를 근본적으로 푼다 |
 | 2 | 스테이블 디퓨전을 활용해도 됨 | ✅ | **병행 채택** — 보유 중인 SDXL(RealVisXL V5) + IPAdapter + Wan I2V를 실사 텍스처·영상화 레이어로 그대로 사용 |
-| 3 | 아주 정교하고 실사 같은 **3D 모델링**을 그대로 영상으로 쓰는 방식(게임 구조) | ✅ | **기록만 / 보류** — TRELLIS.2·Hunyuan3D-2.1은 Q9(라이선스 확인 전 설치 금지)에 걸림. 해소 후 재평가 |
+| 3 | 아주 정교하고 실사 같은 **3D 모델링**을 그대로 영상으로 쓰는 방식(게임 구조) | ✅ | **보류 유지(D69/Q9 조사 완료)** — Hunyuan3D 2.1은 한국이 라이선스 지역에서 제외, TRELLIS.2는 MIT지만 의존성(nvdiffrast) 비상업용 + 24GB VRAM. 현재 Blender 도면 방식이 더 실용적 |
 
 ---
 
@@ -39,9 +39,10 @@ D66 ①(정면 카드)은 얼굴 정보는 고정했지만 **어디에 서 있�
         │  · card: 정면 카드(D66 ①) → 인물 정체성
         │  · visual/motion → 카메라 거리·heading·소품 배치
         ▼
-  [신규] 레이아웃 패스 → layouts/layout_NN.png (블록아웃)
-        │  · Blender 없이도 동작하는 순수 Python 소프트웨어 렌더
-        │  · Blender 설치 시 export_blender()로 동일 좌표계 고퀄리티 렌더
+  [신규] 레이아웃 패스 → layouts/layout_NN.png (D70: Blender 3D 렌더)
+        │  · 기본 백엔드 = Blender 4.5.16 LTS headless (같은 Scene3D를 실제 3D로 렌더)
+        │  · CINEMOKHWA_LAYOUT_BACKEND=cpu 로 기존 numpy+PIL 블록아웃도 선택 가능
+        │  · 실측 라플라시안: Blender 5~15 vs CPU 445 → 실사 잠재 번짐 구조적 해소
         ▼
   [기존] SDXL 키프레임  =  IPAdapter(정면 카드) + img2img(레이아웃)  ← D67 핵심
         ▼
@@ -52,17 +53,26 @@ D66 ①(정면 카드)은 얼굴 정보는 고정했지만 **어디에 서 있�
 
 ### 결정 D67 (3D 레이아웃 패스)
 - 대본의 `anchors`/`visual`/`motion`에서 **결정론적으로** `Scene3D`(카메라·인물·배경 블록)를 만든다.
-- 블록아웃 PNG는 `work/<run>/layouts/layout_NN.png`에 저장하고 캐시키에 포함한다.
-- 로컬 무료 구현: numpy + PIL 소프트웨어 렌더. Blender는 **선택적 백엔드**(같은 Scene3D export).
+- 레이아웃 PNG는 `work/<run>/layouts/layout_NN.png`에 저장하고 캐시키에 포함한다.
+- 원래 numpy+PIL 소프트웨어 렌더로 구현했으나, D70에서 Blender가 **기본 백엔드**가 됨(아래 참조).
 
 ### 결정 D68 (실사 레이어 = 기존 자산 재사용)
 - 인물 정체성: D66 ① 정면 카드를 IPAdapter로 주입(그대로).
 - 구도/원근: 레이아웃 PNG를 img2img 잠재로 주입(신규). 두 참조를 **동시에** 사용.
 - 영상화: Wan I2V 20스텝, 같은 shot 체이닝(그대로). 새 모델·유료 API 없음.
 
-### 결정 D69 (정교 3D 모델링 — 보류)
-- Q9 해소(Animagine XL 4.0·TRELLIS.2·Hunyuan3D-2.1 라이선스 확인) 전 설치 금지 유지.
-- `export_blender()`로 자산 교체 경로는 마련해 두고, 실제 고퀄리티 모델링은 보류.
+### 결정 D69 (정교 3D 모델링 — 보류, Q9 조사 완료)
+- **Hunyuan3D 2.1**: 커뮤니티 라이선스가 **대한민국을 지역에서 제외** → 이 프로젝트에서 사용 불가.
+- **TRELLIS.2**: 모델·코드는 MIT지만 렌더 의존성 `nvdiffrast`/`nvdiffrec`가 별도(비상업) 라이선스 + README상 24GB VRAM/Linux 요구 → 보류.
+- Q9는 "해소 전 설치 금지"가 아니라 **조사 완료 후 부적합 판정**으로 종결. `export_blender()`로 자산 교체 경로만 마련해 두고 고퀄리티 모델링은 보류.
+
+### 결정 D70 (Blender 채택 — 2026-11-21 설치 완료)
+- **Blender vs Unity 비교**: Blender = 무료 GPL, 오프라인 렌더(Cycles/EEVEE), Python 자동화, 정적 구도 도면에 최적.
+  Unity = 실시간 게임 엔진이라 이 파이프라인에는 과하고 유료 티어 필요 → **Blender 채택**.
+- 설치: Blender **4.5.16 LTS** Portable(공식 ZIP 398MB) → `C:\Users\mbc\mokhwa\apps\blender-4.5.16-windows-x64\`.
+- `engine/config.py`: `layout_backend`(기본 `blender`), `blender_exe` 경로 추가. `CINEMOKHWA_LAYOUT_BACKEND=cpu`로 이전 방식 선택 가능.
+- `engine/layout3d.py`: `render_blender()` 추가, `generate()`/`stage_key()`가 backend별 캐시 분리.
+- 실측: 3씬 렌더 **78초**(씬당 26초), 1280×704 PNG, 라플라시안 5~15(CPU 445 대비 30~90배 감소).
 
 ---
 
@@ -70,9 +80,11 @@ D66 ①(정면 카드)은 얼굴 정보는 고정했지만 **어디에 서 있�
 
 | 단위 | 내용 | 상태 |
 |---|---|---|
-| A | 기획 문서 + `engine/layout3d.py` + 오프라인 테스트 | 진행 |
-| B | `keyframe.py` 이중 참조(IPAdapter+img2img) + `cli.py` 6단계 배선 | 예정 |
-| C | 문서 동기화 + 실 스모키(저해상도) + 최종 보고서 | 예정 |
+| A | 기획 문서 + `engine/layout3d.py` + 오프라인 테스트 | ✅ 완료 |
+| B | `keyframe.py` 이중 참조(IPAdapter+img2img) + `cli.py` 6단계 배선 | ✅ 완료 |
+| C | 문서 동기화 + 실 스모키(저해상도) + 최종 보고서 | ✅ 완료 |
+| D | D70 Blender 백엔드 설치·연결 + 3씬 렌더 검증 | ✅ 완료 (`5a3c151`) |
+| E | Blender 백엔드 최종 검증 `guided-50` (20스텝) | 🔄 진행 |
 
-> 각 단위는 별도 커밋·푸시한다. `identity-01` 본 검증 렌더는 main 코드 기준으로 병렬 진행 중이며,
-> 이 브랜치의 변경은 그 프로세스에 영향을 주지 않는다(모듈은 시작 시 메모리에 로드됨).
+> 각 단위는 별도 커밋·푸시한다. `guided-40`(CPU 백엔드 로드 상태)과 `guided-50`(Blender 백엔드)이
+> 순차 렌더 중이며, 완료 시 verify·ffprobe·최종 비교 후 문서·커밋까지 자동 처리된다.
