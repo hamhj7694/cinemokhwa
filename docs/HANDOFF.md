@@ -20,12 +20,12 @@
 | 질문 | 답 |
 |---|---|
 | 무엇을 만드나 | 텍스트/목소리 → 영상 1편을 **완전 로컬·무료·무제한**으로 만드는 파이프라인 |
-| 지금 어디까지 | P1 코어 구현 완료, **속도 목표 달성(60.5분 ≤70분)**. 육안 FAIL 원인을 찾아 **D66 ①(정면 카드) 적용 중**, 20스텝 재검증 렌더 진행 |
-| 이번 작업에서 한 일 | ① **D66 승인 반영** — 인물별 정면 카드를 `references/char_<id>.png`에 만들고 `bible.characters[].ref`에 기록, 컷은 이 카드를 IPAdapter 참조 ② **P1-16** — `verify`가 컷/연장을 구분해 연장은 앞 클립 끝과 이음새, 컷은 SSIM·팔레트, 클립 드리프트까지 출력 ③ 오프라인 테스트·832×480 스모키 완료 ④ `identity-01`(1280×704/20스텝) 렌더 시작 |
+| 지금 어디까지 | D66 ①·P1-16 커밋·푸시 완료. 서버 재시작으로 중단된 `identity-01` 재개 중. **3D 가이드 기획(D67~D69)**을 별도 브랜치에 구현·푸시 완료 |
+| 이번 작업에서 한 일 | ① **D66 ① + P1-16 완료·커밋·푸시**(3개 functional unit) ② **사용자 3개 아이디어 모두 기록**(`docs/design/3D_GUIDED_REALISM.md`) — 1+2 채택, 3은 Q9로 보류 ③ **D67 3D 레이아웃 패스** 구현(결정론적 Scene3D, CPU 블록아웃 3씬 0.18초, Blender export) ④ **D68 이중 참조** 구현(IPAdapter 카드 + img2img 레이아웃 동시 주입, 6단계 파이프라인) ⑤ functional unit별 커밋·푸시 완료 |
 | 숫자로 확인된 것 | 연장 이음새 **MAE 1.17~1.48**(기준 3.0 이하) · 카드 1장 **65.2초**, 832×480 3씬 키프레임 **246.0초** · 기존 run 재측정에서 드리프트 **34~48** 수치화 |
 | **육안 판정(사용자, 2026-11-17)** | ❌ **FAIL** — ① 새 영상 일렁거림·픽셀 이상·얼굴 다름 ② 키프레임 두 남자 다름 ③ 본 검증 영상 뭉개짐·인물/배경 통일성 없음 (이후 개선분 재판정 필요) |
 | 원인 후보(측정) | 6스텝은 연속프레임 MAE **10.97~15.46**(일렁임). 20스텝도 클립 끝이 시작 키프레임에서 **MAE 37~49** 이탈. 참조로 쓴 장면 2 키프레임은 **뒷모습**이라 얼굴 정보가 없음 |
-| 다음 한 걸음 | `identity-01` 완료 → `mokhwa verify` → **사용자 육안 재판정** → 통과 시 P1-07/P1-15 마감, 실패 시 D66 ③(FaceID) 별도 결정 |
+| 다음 한 걸음 | `identity-01` 완료 → `mokhwa verify` → **사용자 육안 재판정**. 3D 가이드는 실 스모키(ComfyUI) 후 main 병합 — VRAM 직렬화 때문에 본 렌더 완료 후 실행 |
 
 ---
 
@@ -137,11 +137,11 @@ P1-16에서 **컷/연장 임계를 나눠야** 합니다.
 
 | 구분 | 내용 |
 |---|---|
-| 완료 | P0 환경 3/3 · P1 코어(P1-01~06, 08) · **P1-13 대본 연속성** · **P1-14 클립 체이닝** · **P1-16 검증 경계 구분** · 작업 로그 체계 |
-| 진행 | **P1-15 재개**(D66 ① 카드 참조) · **`identity-01` 20스텝 렌더 중** (1280×704/20스텝/3씬, 예상 61분) |
-| 실패 | **P1-07 육안 FAIL** — 속도 PASS, 품질/일관성 미달 → `identity-01`로 재검증 |
-| 차단 | **Q8** Figma Starter 호출 한도(P3 UI) · **Q9** M-B/M-C 모델 라이선스 확인 전 설치 금지 |
-| 다음 결정 | ① 결과 육안 PASS면 마감. FAIL이면 D66 ③ FaceID/InstantID 도입(라이선스 확인 후 별도 승인) |
+| 완료 | P0 환경 3/3 · P1 코어 · **P1-13/14/15/16** · **D66 ①·P1-16 커밋/푸시** · **D67 3D 레이아웃 + D68 이중 참조(브랜치, 커밋/푸시 완료)** · 작업 로그 체계 |
+| 진행 | **`identity-01` 20스텝 렌더 재개 중**(scene 1 완료, scene 2부터 재생성) · 3D 가이드 실 스모키 대기 |
+| 실패 | **P1-07 육안 FAIL** — 속도 PASS, 품질/일관성 미달 → `identity-01` + 3D 가이드로 재검증 |
+| 차단 | **Q8** Figma Starter 호출 한도(P3 UI) · **Q9** M-B/M-C·정교 3D 모델 라이선스 확인 전 설치 금지 |
+| 다음 결정 | `identity-01` 육안 PASS면 P1-07 마감. FAIL이면 D66 ③ 또는 3D 가이드 본 검증 |
 
 전체 티켓 현황은 [`docs/TASKS.md`](TASKS.md), 최신 커밋은 `git log --oneline -5`.
 
@@ -155,12 +155,15 @@ P1-16에서 **컷/연장 임계를 나눠야** 합니다.
 | `engine/project.py` | `bible()` 조회 추가 |
 | `engine/character.py` | **D66 ① 신규** — 정면 카드 4시드 생성, `references/char_<id>.png`, `bible.characters[].ref` 기록, 컷 참조 선택 |
 | `engine/keyframe.py` | `prompt_for()`(앵커 문구), `reference_target()`/`reference_path()`(폴백 참조), `stage_key(ref_card=…)`, 워크플로 3분기(none/ipadapter/img2img), 자동 폴백 |
+| `engine/layout3d.py` | **D67 신규** — 결정론적 `Scene3D`, numpy+PIL 블록아웃, `layouts/layout_NN.png`, `export_blender()` |
 | `engine/verify.py` | **P1-16** — `shot`으로 컷/연장 구분, 연장=앞 클립 끝 이음새, 컷=SSIM·팔레트, 드리프트 WARN |
+| `tests/test_layout3d.py` | D67/D68 오프라인 검증 — 결정성·투사·캐시·이중참조 노드 연결 ALL PASS |
+| `docs/design/3D_GUIDED_REALISM.md` | 사용자 3아이디어 기록 + D67~D69 채택/보류 근거 |
 | `engine/i2v.py` | `CHAIN_OVERLAP=0`, `last_frame()`, `_mae()`, `generate(chain_from=…)`, 메타에 `overlap`/`seam_mae`/**`gen_seconds`·`elapsed`** |
 | `engine/assemble.py` | `timeline.json`에 `shot` 추가 |
 | `engine/config.py` | `kf_reference`·`ipadapter_preset`·`ipadapter_weight`·`img2img_denoise` |
 | `cli.py` | `chain_sources()`, **5단계 파이프라인(카드 단계 추가)**, 카드→키프레임 참조 배선, 클립 체이닝, `cmd_batch` 복원 |
-| `docs/DESIGN.md` | D63(2축) · D64(참조 주입) · D65(겹침 0) · **D66(① 정면 카드 승인)** |
+| `docs/DESIGN.md` | D63~D66 + **D67(3D 패스) · D68(기존 실사 자산) · D69(정교 3D 보류)** |
 | `docs/TASKS.md` | P1-13/14/15 상태, P1-16/17 추가 |
 | `engine/README.md` | 일관성 규격·실측표·참조 절차 |
 | `docs/WORKLOG.md` | run별 실측 로그(신규) — 기록 규칙·과거 run 역기입 |
@@ -194,12 +197,12 @@ P1-16에서 **컷/연장 임계를 나눠야** 합니다.
 
 ## 9. 다음 단계
 
-1. ~~D66 결정~~ — **① 승인 완료**, 구현 완료.
-2. ~~P1-16 검증 수정~~ — 완료(컷/연장 구분 + SSIM·팔레트·드리프트).
-3. `identity-01` 렌더 완료 대기 → `mokhwa verify --run-id identity-01` → `final.mp4` **사용자 육안 재판정**.
-4. 육안 PASS면 P1-07/P1-15/P1-17 마감. FAIL이면 D66 ③(FaceID/InstantID) 라이선스 확인 후 별도 승인.
+1. ~~D66 결정~~ / ~~P1-16 검증 수정~~ / ~~D67~D69 기획·코드~~ — 완료.
+2. `identity-01` 렌더 완료 → `mokhwa verify --run-id identity-01` → `final.mp4` **사용자 육안 재판정**.
+3. 3D 가이드 실 스모키(저해상도, ComfyUI) → 결과 확인 후 `feature/3d-guided-realism`을 main에 병합.
+4. 육안 PASS면 P1-07/P1-15/P1-17 마감. FAIL이면 D66 ③ 또는 3D 가이드 본 검증.
 5. P1-09(재시도)·P1-10(manifest)·P1-11(batch)·P1-12(화풍)는 그 뒤.
-6. M-B/P2.5·M-C/P3.5는 **Q9 해제 전 모델 설치 금지**.
+6. M-B/P2.5·M-C/P3.5·정교 3D 모델은 **Q9 해제 전 설치 금지**.
 
 ---
 
@@ -243,4 +246,5 @@ P1-16에서 **컷/연장 임계를 나눠야** 합니다.
 | 2 | 컷 사이 인물 동일성 | ❌ **FAIL 보고됨** → D66 ① 적용본 육안 재판정 대기 |
 | 3 | ~~D66 인물 동일성 전략~~ | ✅ **① 승인·구현 완료**. 실패 시 ③ FaceID/InstantID는 라이선스 확인 후 별도 승인 |
 | 4 | Q8 Figma 한도 리셋/플랜 | 사용자 |
-| 5 | Q9 M-B·M-C 모델 라이선스 근거 | 사용자/조사 |
+| 5 | Q9 M-B·M-C·정교 3D 모델 라이선스 근거 | 사용자/조사 |
+| 6 | 3D 가이드 실 스모키 후 main 병합 여부 | 나(자동) → 최종 확인은 사용자 |

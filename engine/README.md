@@ -38,18 +38,20 @@ M-B(2D 셀)·M-C(3D)·T0는 각각 P2.5 / P3.5 / P1.5에서 이 패키지 옆에
 | `project.py` | run 디렉터리·state·재개 | `done(stage,key)` = 상태 AND 입력 해시 일치 |
 | `script.py` | 대본 JSON (gemma4:12b) | 1회 교정 후 실패하면 중단(임의 생성 금지) · `bible`/`shot`/`anchors` 검증 |
 | `character.py` | **D66 ① 정면 카드** | `references/char_<id>.png` · `bible.characters[].ref` · 컷 참조 1순위 |
-| `keyframe.py` | SDXL 4시드 → 최고 선택 | 중앙 40% 라플라시안 분산 · 앵커 프롬프트 · 컷 장면은 카드/앞 키프레임 IPAdapter·img2img 참조 |
+| `layout3d.py` | **D67 3D 레이아웃** | 결정론적 `Scene3D` · numpy+PIL 블록아웃 · `layouts/layout_NN.png` · `export_blender()` |
+| `keyframe.py` | SDXL 4시드 → 최고 선택 | 중앙 40% 라플라시안 분산 · 앵커 프롬프트 · **정체성=카드 IPAdapter + 구도=레이아웃 img2img 동시 주입** |
 | `i2v.py` | Wan I2V → PNG 마스터 → CRF16 | `length=4k+1` · shift 8 · fp8 · 같은 `shot`은 마지막 프레임에서 연장 |
 | `assemble.py` | 인코딩·크로스페이드·타임라인 | `sum(d) - crossfade×(n-1)` · `timeline`에 `shot` |
 
-## 장면 간 일관성 (D63~D66)
+## 장면 간 일관성 (D63~D69)
 
-두 축으로 나눈다. **연장은 픽셀, 컷은 앵커.**
+세 축으로 나눈다. **연장은 픽셀, 컷은 앵커 + 카드, 구도는 3D 레이아웃.**
 
 | 축 | 트리거 | 수단 |
 |---|---|---|
 | 연장 | 앞 장면과 `shot`이 같다 | 앞 클립 **마지막 PNG**를 다음 클립 `start_image`로 넣는다 |
 | 컷 | `shot`이 다르다 | **bible 앵커**(`char:`/`place:` + `look`)를 키프레임 프롬프트에 주입하고, **인물 정면 카드**(D66 ①)를 참조 이미지로 넣는다. 카드가 없으면 앞 장면 키프레임으로 폴백(D64) |
+| 구도 | 전 장면 | **3D 레이아웃 패스**(D67)가 카메라 거리·인물 좌표·배경 블록을 결정론적으로 정하고 블록아웃 PNG를 img2img 잠재로 주입(D68) |
 
 `script.json`(`schema: 2`)이 이 정보를 담는다.
 
@@ -118,13 +120,28 @@ M-B(2D 셀)·M-C(3D)·T0는 각각 P2.5 / P3.5 / P1.5에서 이 패키지 옆에
 | IPAdapter 영향(과거) | w0.0 vs w1.0 **MAE 54.82** | 노드가 무시되지 않고 실제 반영됨 |
 | 폴백(과거) | 프리셋을 깨뜨림 → `COMFY-002` → img2img 성공 | 자동 폴백 동작 |
 
+### 3D 레이아웃 패스 + 이중 참조 (D67/D68)
+
+컷마다 인물 위치·카메라가 달라지던 문제를 막기 위해 대본을 3D 좌표로 먼저 푼다.
+
+| 항목 | 값 |
+|---|---|
+| 빌더 | `layout3d.build_scene()` — `visual`/`motion`의 wide·close·behind·dolly 키워드로 카메라 거리(3~11m)·heading·배경 블록 결정 |
+| 렌더 | numpy+PIL 소프트웨어 블록아웃 → `work/<run>/layouts/layout_NN.png`. 3씬 **0.18초**(CPU만) |
+| 정체성 참조 | D66 ① 정면 카드 → `IPAdapterAdvanced` (모델 분기) |
+| 구도 참조 | 레이아웃 PNG → `ImageScale` → `VAEEncode` → KSampler latent 분기(denoise 0.55) |
+| 효과 | 한 워크플로에서 **모델=카드, 잠재=레이아웃**을 동시에 주입 |
+| Blender | 설치 시 `export_blender()`가 같은 `Scene3D`를 headless 스크립트로 내보냄. 지금은 export만 |
+| 정교 3D 모델 | D69 — Q9 라이선스 확인 전 설치 금지(기록만) |
+| 조절 | `CINEMOKHWA_LAYOUT_DENOISE`(기본 0.55) — 낮으면 도면 색이 남고 높으면 구도 힌트만 남음. `CINEMOKHWA_KF_REF=none`이면 카드·레이아웃 참조 모두 꺼짐 |
+
 ### 참조 주입 방식 (D64 — 카드/키프레임 공통)
 
 | 항목 | 값 |
 |---|---|
 | 1순위 | `IPAdapterUnifiedLoader`(`PLUS (high strength)`) → `IPAdapterAdvanced` (weight 0.8, linear, V only) |
 | 폴백 | 같은 시드에서 `LoadImage` → `ImageScale` → `VAEEncode` → `KSampler(denoise 0.55)` |
-| 캐시키 | 카드는 내용 해시(`ref_card`), 키프레임 폴백은 **대상 장면 id** + 방식이 캐시 키에 들어간다 |
+| 캐시키 | 카드는 내용 해시(`ref_card`), 레이아웃은 파일 해시(`layout_digest`), 키프레임 폴백은 **대상 장면 id** + 방식 |
 
 인물 동일성은 수치로 판정하지 않는다. 픽셀 MAE는 구도가 달라지면 의미가 없고,
 PRD §13.5와 같이 **육안 판정**이 우선이다. 파이프라인은 "참조가 실제로 쓰였는가"까지만
@@ -159,22 +176,24 @@ PRD §13.5와 같이 **육안 판정**이 우선이다. 파이프라인은 "참�
 `work/<run_id>/state.json`에 단계별 `{status, key, started, finished, seconds}`를 남긴다.
 `key`는 그 단계 입력의 sha1이다.
 
-5단계: **script → characters → keyframes → clips → assemble**.
+6단계: **script → characters → layout → keyframes → clips → assemble**.
 
 | 바꾼 것 | 다시 도는 단계 |
 |---|---|
 | 주제·길이·화풍·LLM | script → 이후 전부 |
 | `SYSTEM` 프롬프트·스키마 | script → 이후 전부 |
 | bible 인물 `desc`(카드 프롬프트) | characters → keyframes → clips → assemble |
-| bible 장소·`look`·anchors | keyframes → clips → assemble |
+| bible 장소·`look`·anchors | layout → keyframes → clips → assemble |
 | 캐릭터 카드 내용·`CINEMOKHWA_KF_REF` | keyframes → clips → assemble |
+| visual·motion(구도 키워드) | layout → keyframes → clips → assemble |
 | `shot` 배치(어떤 씬이 연장인지) | clips → assemble |
 | visual 프롬프트 | keyframes → clips → assemble |
 | motion 프롬프트·스텝 | clips → assemble |
 | 크로스페이드·CRF | assemble |
 
 `state.json`의 `characters.items[]`에는 인물별 카드 파일·선택 시드·선명도,
-`keyframes.items[]`에는 장면별 선택 시드·선명도·참조 방식(`char:<id>` / 앞 장면 id / none)·`elapsed`,
+`layout.items[]`에는 장면별 구도 feature(wide/close/behind/depth)·캐시키,
+`keyframes.items[]`에는 장면별 선택 시드·선명도·참조 방식(`char:<id>` / 앞 장면 id / none)·`layout`·`elapsed`,
 `clips.items[]`에는 프레임 수·재생 길이·`overlap`·`seam_mae`·`gen_seconds`·`elapsed`가 남는다.
 run 단위 요약은 `docs/WORKLOG.md`에 1행으로 적는다(TASKS §0 규칙 8).
 

@@ -38,7 +38,7 @@
 9. docs/prompts/figma-uiux.md — 과거 Figma MCP 실행 프롬프트
 10. docs/prompts/design-to-figma-playbook.md — 재사용 플레이북
 
-[현재 상태 — 2026-11-17, 최신 커밋 482f99e + D66/P1-16 미커밋 작업]
+[현재 상태 — 2026-11-21, main 36677de / feature/3d-guided-realism dcf4a46]
 - 먼저 `docs/HANDOFF.md`를 읽어라. 프로젝트를 모르는 사람용 최신 요약·실행법·함정이 한 문서에 있다.
 - P0 환경 완료: ComfyUI Portable 0.45.0, 모델 4종, ffmpeg, Ollama gemma4:12b, 디스크 315GB.
 - P1 코어(M-A): cli.py + mokhwa.cmd + engine/ 8모듈. P1-01~06·08 완료.
@@ -61,8 +61,12 @@
   ①로도 실패 시에만 ③ FaceID/InstantID를 라이선스 확인 후 별도 승인.
 - P1-16 **완료**: `verify`가 `shot`으로 컷/연장 구분. 연장=앞 클립 끝 이음새 MAE,
   컷=자기 키프레임 + SSIM·팔레트, 클립 드리프트는 별도 WARN.
-- `identity-01` **20스텝 본 검증 렌더 중**(1280×704/3씬, 예상 61분, 2026-11-17T19:02 시작).
+- `identity-01` **20스텝 본 검증 재개 중** — 서버 재시작으로 scene 2에서 중단, ComfyUI 재기동 후 재생성.
   완료 후 `mokhwa verify --run-id identity-01` + `final.mp4` **사용자 육안 재판정** 대기.
+- **3D 가이드(2026-11-21 사용자 요청)**: 아이디어 3개를 `docs/design/3D_GUIDED_REALISM.md`에 기록.
+  D67 결정론적 3D 레이아웃(engine/layout3d.py, CPU 블록아웃 3씬 0.18초, Blender export),
+  D68 정체성 카드 IPAdapter + 구도 레이아웃 img2img 동시 주입, 6단계 파이프라인.
+  D69 정교 3D 모델은 Q9로 보류. `feature/3d-guided-realism` 브랜치에 functional unit별 커밋·푸시 완료.
 - P1-09(재시도)·P1-10(manifest)·P1-11(batch)·P1-12(화풍 5종) 대기.
 - Figma: 파일 pT68j17duxcGL2tdMfdFQd, 3페이지·토큰 5컬렉션·텍스트 9종·보드 6장·컴포넌트 22개·S0~S5.
   Q8(MCP 한도)로 S5 하단 잘림/03 Handoff/상태·플로우/모드 선택 화면 미완.
@@ -77,6 +81,9 @@
 - D65: 체이닝 겹침 0. 앞 클립 마지막 프레임을 그대로 시작. 실측 MAE 1.17로 확정.
 - D66(Q11 해결): **① 정면 카드 채택·승인·구현 완료.** 컷=정면 카드 참조, 연장=D65 체이닝 유지.
   새 모델·유료 API 없이 기존 SDXL 4시드 재사용. ③ FaceID는 ① 실패 시 별도 승인.
+- D67: 대본→결정론적 3D 배치→블록아웃 PNG. Blender 미설치라 순수 Python 렌더, export만 지원.
+- D68: 카드(IPAdapter)=정체성 + 레이아웃(img2img)=구도 동시 주입. 기존 무료 자산만.
+- D69: 정교 3D 모델은 Q9 해소 전 설치 금지(기록만).
 - D58~D61: 실사 정식 지원, 렌더 모드 3종(M-A/M-B/M-C), 입력 2종, T0 채택.
 - 무료/로컬/무제한: 외부 유료 API 키 금지, 스톡 대체 금지(픽셀 생성).
 - VRAM 12GB: GPU 작업 직렬화(모델 동시 로드 금지), 피크 ≤11.5GB.
@@ -110,12 +117,12 @@
 - SYSTEM 프롬프트·schema 변경은 기존 run의 대본 단계를 무효화한다(의도된 캐시 동작).
 
 [다음 작업 — 우선순위]
-1. (진행) `identity-01` 렌더 완료 대기 → `mokhwa verify --run-id identity-01` → state.json 소요·seam_mae·final.mp4 ffprobe 확인.
+1. (진행) `identity-01` 렌더 완료 대기 → `mokhwa verify --run-id identity-01` → final.mp4 ffprobe + WORKLOG 실측.
 2. (판정) `C:\Users\mbc\mokhwa\work\identity-01\final.mp4` **사용자 육안 재판정**. PASS면 P1-07/P1-15/P1-17 마감.
-3. (조건) 육안 FAIL이면 D66 ③ FaceID/InstantID 라이선스 확인 후 별도 승인 요청(D39).
-4. (문서) WORKLOG 14행 실측 채우고 HANDOFF/TASKS 갱신 → py_compile·오프라인 테스트 → 커밋 → `git push origin main`.
+3. (스모키) 3D 가이드 저해상도 ComfyUI 스모키(본 렌더 종료 후 VRAM 직렬화) → feature 브랜치 main 병합.
+4. (조건) 육안 FAIL이면 D66 ③ FaceID/InstantID 또는 3D 가이드 본 검증.
 5. (선택) Figma 재개: MCP 대신 브라우저/컴퓨터 유즈로 S5 잘림/03 Handoff/상태·플로우/모드 선택(Q8).
-6. Q9 해제 전 M-B·M-C 모델 설치 금지.
+6. Q9 해제 전 M-B·M-C·정교 3D 모델 설치 금지.
 
 [첫 응답 형식]
 문서를 읽고 아래만 보고한 뒤 멈춰라.
