@@ -24,10 +24,32 @@ _REGION = 0.4
 
 
 def prompt_for(project: project_mod.Project, scene: dict) -> str:
-    """bible 앵커 + 화면 설명 + 화풍. 앵커가 인물·장소·조명을 씬 사이에 고정한다."""
+    """bible 앵커 + 화면 설명 + 화풍. 앵커가 인물·장소·조명을 씬 사이에 고정한다.
+
+    2026-11-21 사용자 피드백 반영: 같은 골목인데 씬마다 밝기·분위기가 달라
+    "다른 공간 같다"는 지적. 대본의 scene별 visual(`wet asphalt glow` 등)이
+    암부를 유도하므로, **장소·조명·노출 앵커를 모든 씬에 강제로 같은 값**으로
+    앞에 붙인다. place 앵커가 빠진 씬(scene 3)도 여기서 보강된다.
+    """
     style = STYLES.get(project.style, STYLES["cinematic"])
-    anchors = anchor_text(project.bible(), list(scene.get("anchors") or []))
-    parts = [p for p in (anchors, scene["visual"]) if p]
+    bible = project.bible()
+    anchors = anchor_text(bible, list(scene.get("anchors") or []))
+    # 장소 앵커 상시 보강 — 대본에 place:alley가 없어도 같은 골목으로 고정.
+    places = ", ".join(
+        str(p.get("desc", "")).strip()
+        for p in (bible.get("places") or [])
+        if isinstance(p, dict) and str(p.get("desc", "")).strip()
+    )
+    # anchor_text에 이미 place가 들어간 씬은 중복 제거. 없는 씬(scene 3)만 보강.
+    if places and places in anchors:
+        places = ""
+    # scene별 암부 유도 표현을 밝은 반사로 치환 — 대본은 그대로 두고 프롬프트만 보정.
+    visual = str(scene["visual"]).replace(
+        "wet asphalt glow", "wet asphalt glowing with bright neon reflections"
+    )
+    # 조명/노출 고정 — 씬 간 밝기 들쭉날쭉(실측 Y 33.7 vs 105.7) 방지.
+    fixed = "same location, consistent lighting, identical exposure and colour palette across all shots"
+    parts = [p for p in (anchors, places, fixed, visual) if p]
     return f"{', '.join(parts)}, {style['suffix']}"
 
 
@@ -244,6 +266,8 @@ def stage_key(
     return project_mod.digest(
         {
             "stage": "keyframe",
+            # 프롬프트 전체를 해시 — 조명/장소 앵커 강제 고정(prompt_for)이 바뀌면 캐시 무효화.
+            "prompt": prompt_for(project, scene),
             "visual": scene["visual"],
             "anchors": anchor_text(project.bible(), list(scene.get("anchors") or [])),
             "seeds": SEEDS,
