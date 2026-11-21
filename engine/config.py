@@ -15,6 +15,9 @@ from .errors import CineError
 
 DEFAULT_ROOT = r"C:\Users\mbc\mokhwa"
 
+# P2 이미지 생성 모델 드롭다운 후보. CLI/UI는 이 목록을 그대로 노출한다.
+IMAGE_MODELS = ("krea2", "qwen21", "sdxl")
+
 
 @dataclass
 class Config:
@@ -78,6 +81,44 @@ class Config:
     wan_unet: str = "wan2.2_ti2v_5B_fp16.safetensors"
     wan_clip: str = "umt5_xxl_fp8_e4m3fn_scaled.safetensors"
     wan_vae: str = "wan2.2_vae.safetensors"
+
+    # --- P2 하이브리드 (3차 개정: 3D는 틀, 실사가 외형) ---
+    # 이미지 생성 모델 드롭다운: krea2(기본) | qwen21 | sdxl(레거시)
+    image_model: str = field(
+        default_factory=lambda: os.environ.get("CINEMOKHWA_IMAGE_MODEL", "krea2").strip().lower()
+    )
+    # LTX-2.5 (GGUF + comfy-native w4a8 텍스트 인코더)
+    ltx_dit: str = "ltx-2.5-22b-distilled-UD-Q3_K_XL.gguf"
+    ltx_dit_small: str = "ltx-2.5-22b-distilled-UD-Q2_K_XL.gguf"  # OOM 대비
+    ltx_text_encoder: str = "gemma4-12b-ltx25-comfy-w4a8.safetensors"
+    ltx_video_vae: str = "ltx-2.5-video-vae-conv-bf16.safetensors"
+    ltx_audio_vae: str = "ltx-2.5-audio-vae-bf16.safetensors"
+    ltx_spatial_upscaler: str = "ltx-2.5-latent-spatial-upscaler-x2-bf16-1.0.safetensors"
+    ltx_layout_lora: str = "ltx-2.5-22b-ic-lora-layout-to-render-1.0.safetensors"
+    ltx_msr_lora: str = "LTX-2.5-Licon-MSR-V2.safetensors"
+
+    # Krea 2 — GGUF DiT(city96 포크) + Qwen3VL 텍스트 인코더 + 공용 VAE
+    krea2_dit: str = "Krea-2-Turbo-Q5_K_S.gguf"
+    krea2_clip: str = "qwen3vl_4b_fp8_scaled.safetensors"
+    krea2_vae: str = "qwen_image_vae.safetensors"
+    # Qwen-Image 2.1 — comfy-native int8 + qwen3vl 8B w4a8 + Turbo LoRA
+    qwen21_dit: str = "qwen_image_2.1_int8_convrot.safetensors"
+    qwen21_clip: str = "qwen3vl_8b_w4a8.safetensors"
+    qwen21_vae: str = "qwen_image_2.1_vae_bf16.safetensors"
+    qwen21_turbo_lora: str = "qwen_image_2.1_turbo_lora_avg_rank_178_bf16.safetensors"
+
+    # 얼굴 게이트 — 숫자는 보조. 최종 합격은 사람 눈으로 확인한다.
+    face_gate_pass: float = 0.60
+
+    # AI 티 제거 프롬프트 (3차 개정). 실사 사진/키프레임 생성에 공통 적용.
+    photoreal_positive: str = (
+        "photorealistic, shot on Sony A7R V, 85mm f/1.8, natural skin pores, "
+        "subtle film grain, real-world lighting, candid documentary photograph"
+    )
+    photoreal_negative: str = (
+        "3d render, CGI, cartoon, anime, illustration, plastic skin, oversaturated, "
+        "airbrushed, AI artifact, blurry, watermark, text"
+    )
 
     # ---------------------------------------------------------------- paths
     @property
@@ -153,6 +194,68 @@ class Config:
             ("Wan UNET", m / "diffusion_models" / self.wan_unet),
             ("Wan 텍스트 인코더", m / "text_encoders" / self.wan_clip),
             ("Wan VAE", m / "vae" / self.wan_vae),
+        ]
+
+    def validate_image_model(self) -> str:
+        """드롭다운 값 검증. 잘못된 값은 설정 오류로 즉시 중단한다."""
+        model = self.image_model.strip().lower()
+        if model not in IMAGE_MODELS:
+            raise CineError(
+                "CFG-003",
+                f"알 수 없는 이미지 모델: {self.image_model}",
+                hint=f"가능한 값: {', '.join(IMAGE_MODELS)}",
+            )
+        return model
+
+    @property
+    def ltx_dit_loader(self) -> str:
+        """ComfyUI UnetLoaderGGUF 드롭다운 값 (하위폴더 구분자 포함)."""
+        return "distilled\\" + self.ltx_dit
+
+    @property
+    def ltx_dit_small_loader(self) -> str:
+        """OOM 대비 Q2 GGUF의 ComfyUI 로더 이름."""
+        return "distilled\\" + self.ltx_dit_small
+
+    def p2_model_files(self) -> list[tuple[str, Path]]:
+        """P2 파이프라인이 **반드시** 필요한 파일 목록 (env check용).
+
+        Layout-to-Render LoRA는 HF 승인제라 없어도 되므로 `p2_optional_model_files()`로 분리했다.
+        없으면 3D 구도를 프레임 앵커(LTXVAddGuide)로 직접 주입한다.
+        """
+        m = self.models
+        model = self.validate_image_model()
+        files = [
+            ("LTX DiT", m / "unet" / "distilled" / self.ltx_dit),
+            ("LTX 텍스트 인코더", m / "text_encoders" / self.ltx_text_encoder),
+            ("LTX 영상 VAE", m / "vae" / self.ltx_video_vae),
+            ("LTX 오디오 VAE", m / "vae" / self.ltx_audio_vae),
+            ("LTX 업스케일러", m / "latent_upscale_models" / self.ltx_spatial_upscaler),
+            ("MSR V2 LoRA", m / "loras" / self.ltx_msr_lora),
+        ]
+        if model == "krea2":
+            files += [
+                ("Krea2 DiT", m / "unet" / self.krea2_dit),
+                ("Krea2 텍스트 인코더", m / "text_encoders" / self.krea2_clip),
+                ("Krea2 VAE", m / "vae" / self.krea2_vae),
+            ]
+        elif model == "qwen21":
+            files += [
+                ("Qwen21 DiT", m / "diffusion_models" / self.qwen21_dit),
+                ("Qwen21 텍스트 인코더", m / "text_encoders" / self.qwen21_clip),
+                ("Qwen21 VAE", m / "vae" / self.qwen21_vae),
+                ("Qwen21 Turbo LoRA", m / "loras" / self.qwen21_turbo_lora),
+            ]
+        else:
+            files.append(("SDXL 체크포인트", m / "checkpoints" / self.sdxl_ckpt))
+        return files
+
+    def p2_optional_model_files(self) -> list[tuple[str, Path]]:
+        """없어도 파이프라인이 동작하는 파일. 없으면 안내만 하고 계속 진행한다."""
+        m = self.models
+        return [
+            ("Layout-to-Render LoRA (승인제)", m / "loras" / self.ltx_layout_lora),
+            ("LTX DiT Q2 (OOM 대비)", m / "unet" / "distilled" / self.ltx_dit_small),
         ]
 
     def scene_count(self, target_seconds: float) -> int:

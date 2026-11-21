@@ -182,8 +182,11 @@ class Comfy:
         """history record → 이미지 참조 목록(filename/subfolder/type)."""
         refs: list[dict] = []
         for node in (record.get("outputs") or {}).values():
-            for image in node.get("images", []) or []:
-                refs.append(image)
+            # SaveImage → images, SaveVideo → gifs (ComfyUI 관례)
+            for key in ("images", "gifs", "videos"):
+                for item in node.get(key, []) or []:
+                    if item not in refs:
+                        refs.append(item)
         return refs
 
     def download(self, ref: dict, dest: Path) -> Path:

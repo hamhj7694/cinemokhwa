@@ -1,7 +1,8 @@
 # 신규 파이프라인 연구 — 정체성·구도 우선 하이브리드 (P2)
 
-> 작성: 2026-11-21 · 개정: 2026-11-21 (2차) · 상태: **연구 완료 / 설치 진행 중**
+> 작성: 2026-11-21 · 개정: 2026-11-21 (3차) · 상태: **연구 완료 / 설치 진행 중**
 > 2차 개정: **GGUF 경로 확정** (12GB 실행 가능) + 공식 **Layout-to-Render IC-LoRA** 발견 + **MSR V2 다중 참조** 채택
+> 3차 개정: **3D는 틀만, 외형은 실사 이미지** (사용자 지적 반영) + **Krea 2 / Qwen-Image 2.1 드롭다운** 추가
 > 배경: 사용자의 육안 판정 — *"지금도 다른 인물 같아. 지금 방식 그대로 하면 완성도 높은 영상 만들기는 어려울 거 같아. 일단 보류하고 다른 신규 파이프라인을 연구해보자!"*
 > 사용자 제안 원문 — *"여러 객체나 인물이나 배경 요소를 핀 처럼 앵커하거나 고정하거나, ltx-2.5 사용하거나, 스테이블 디퓨전쓰거나, 블렌더로 풀 영상 구도 3d 모델링 먼저하고 그 위에 실사를 입히는 방식이나, 혹은 이러한 방식들을 혼합하는 방식으로 진행하자!!!!!!!!"*
 > 결정: 기존 3D 가이드 파이프라인(D63~D72)은 **보류**. 신규 run ID는 `p2-*`.
@@ -115,23 +116,56 @@ Google DeepMind의 BlenderFusion(arXiv:2506.17450) 파이프라인에서 차용�
 > 하지만 "정확한 제어는 Blender가, 사실감은 생성 모델이"라는 **역할 분리 원칙은 그대로 쓸 수 있다.**
 > VerseCrafter(TencentARC)도 Blender 전처리 → point cloud → video diffusion 순서를 쓴다. 같은 방향.
 
-### 3.4 Stable Diffusion 역할 재정의
+### 3.4 역할 재정의 — 3D는 "틀", 실사 이미지가 "외형" (3차 개정)
+
+> **사용자 지적(2026-11-21):**
+> *"3d로 영상의 틀만 잡고, 그 위에 인물이나 물품, 사물, 배경은 실사 혹은 아주 실사적이고
+> ai티 안나는 ai 생성이미지사진을 모티브로 해야하는 거 아니야? 내가 잘 못 이해했나?"*
+>
+> **→ 맞습니다. 2차 개정의 L0이 모순돼 있었습니다.** 3D 렌더를 LoRA 학습 데이터로 쓰면
+> 모델은 3D 재질·조명 톤을 "정체성"으로 배웁니다. 3D는 **구조만**, 실사는 **외형만** 담당하게 고칩니다.
+
+| 요소 | 2차 개정 (잘못됨) | **3차 개정 (정정)** |
+|---|---|---|
+| 3D 렌더 역할 | LoRA 학습 데이터 = 정체성 원본 | **오직 틀**: 카메라 경로, 객체 위치, 깊이/분할/bbox/포즈 |
+| 실사 이미지 역할 | 키프레임 결과물일 뿐 | **외형·정체성·질감의 유일한 원본** |
+| LoRA 학습 데이터 | 3D 다각도 렌더 24장 | **실사 AI 사진 24장**(동일 인물, 3D 포즈를 조건으로 생성) |
+| 다각도 확보 방법 | 3D 모델 회전 렌더 | 3D가 포즈·각도를 지정 → 실사 모델이 그 포즈의 사람을 생성 |
+| 배경·소품 | 3D 메시 색상 | 3D는 위치만, 실제 질감은 실사 생성 이미지를 콜라주/합성 |
 
 | 기존 | 신규 |
 |---|---|
-| 참조 이미지 → IPAdapter로 매 씬 얼굴 흉내 | **한 번 학습된 캐릭터 LoRA**가 정체성 소유 |
-| 키프레임 품질만 담당 | 키프레임 + ControlNet(depth/pose/seg) 조건 + 실사 질감 담당 |
-| 참조가 끊기면 타인 | LoRA는 시드·참조 유무와 무관하게 같은 가중치 → 구조적 동일성 |
+| 참조 이미지 → IPAdapter로 매 씬 얼굴 흉내 | **실사 기준 사진 + LoRA**가 정체성 소유. 3D는 얼굴을 만들지 않음 |
+| SDXL만 사용 | **Krea 2 / Qwen-Image 2.1 / SDXL** 중 드롭다운 선택 |
+| 키프레임 품질만 담당 | 키프레임 + 3D 조건(depth/pose/seg) + 실사 질감 담당 |
+| 참조가 끊기면 타인 | 가중치와 앵커가 고정 → 구조적 동일성 |
 
- PuLID/InstantID는 얼굴 고정 강도가 높지만 InsightFace(비상업) 의존 또는 라이선스 문제로 제외.
- 학습 LoRA가 공개 비교에서 모든 지표 1위 → **LoRA를 정체성 원본으로 확정.**
+> PuLID/InstantID는 InsightFace(비상업) 의존으로 제외.
+> 학습 LoRA가 공개 비교에서 1위지만, **학습 재료는 반드시 실사 이미지**여야 한다.
+
+### 3.6 실사 이미지 모델 드롭다운 (사용자 요청)
+
+CLI `p2 make --image-model {krea2,qwen21,sdxl}` / `Config.image_model` / UI 드롭다운으로 전환한다.
+기본값은 **Krea 2**(상업 가능 + 사진 톤). Qwen-Image 2.1은 성능은 좋지만 **라이선스 주의**.
+
+| 모델 | ComfyUI 노드 | 12GB 구성 | 스텝 | 라이선스 | 역할 |
+|---|---|---|---|---|---|
+| **Krea 2 (기본)** | `UNETLoader`(GGUF fork) + `CLIPLoader type=krea2` + `VAELoader` | DiT GGUF Q5_K_S 8.2GB + TE fp8 4.9GB + VAE 0.2GB | Turbo 8 | **Krea-2 Community**: 연매출 <$1M 무료 상업, 이상은 Enterprise | 사진 같은 피부·질감, 인물/소품/배경 기준 사진 |
+| **Qwen-Image 2.1** | `UNETLoader` + `CLIPLoader type=qwen_image` + `VAELoader` | int8_convrot 6.8GB + TE w4a8 5.9GB + VAE 0.6GB | Turbo LoRA 5~8 | **⚠ Qwen Research License: 비상업(연구·평가) 전용**. 상업 실행 시 별도 라이선스 필요 | 최대 10장 참조로 인물/제품 정체성 보존, 사실적 텍스처·조명 |
+| SDXL (레거시) | 기존 `checkpoint` + IPAdapter | RealVisXL 6.5GB | 32 | 기존 사용 중 | 이전 파이프라인 호환용 |
+
+> **AI 티 방지 공통 프롬프트 규칙**: `photorealistic, shot on Sony A7R V, 85mm f/1.8, natural skin
+> pores, subtle film grain, real-world lighting, no illustration, no 3d render, no plastic skin`
+> 네거티브: `3d render, CGI, cartoon, anime, plastic, oversaturated, airbrushed, AI artifact`.
+
+생성한 이미지는 `face_identity.py` 게이트(≥0.60)와 **육안 확인**을 모두 통과해야 앵커 뱅크에 저장된다.
 
 ### 3.5 12GB 실행 구성 확정 (다운로드 진행 중)
 
 | 컴포넌트 | 파일 | 크기 | 설치 위치 |
 |---|---|---|---|
 | distilled DiT | `unsloth/LTX-2.5-GGUF` → `ltx-2.5-22b-distilled-UD-Q3_K_XL.gguf` | 12.00 GB | `models/unet/` |
-| 텍스트 인코더 | `elix3r/gemma4-12b-with-proj-ltx-2.5-GGUF` → `Q4_K_M.gguf` | 7.84 GB | `models/text_encoders/` |
+| 텍스트 인코더 | `joeygambino/LTX-2.5-Quantized` → `gemma4-12b-ltx25-comfy-w4a8.safetensors` | 9.88 GB | `models/text_encoders/` |
 | 영상 VAE | `ltx-2.5-video-vae-conv-bf16.safetensors` | 1.35 GB | `models/vae/` |
 | 오디오 VAE | `ltx-2.5-audio-vae-bf16.safetensors` | 0.34 GB | `models/vae/` |
 | 공간 업스케일러 | `ltx-2.5-latent-spatial-upscaler-x2-bf16-1.0.safetensors` | 0.93 GB | `models/latent_upscale_models/` |
@@ -142,32 +176,38 @@ Google DeepMind의 BlenderFusion(arXiv:2506.17450) 파이프라인에서 차용�
 설치 스크립트: `tools/download_p2_models.ps1`, `tools/install_p2_nodes.ps1`.
 커스텀 노드 4종(ComfyUI-GGUF / ComfyUI-LTXVideo / ComfyUI-LTX2.5-MSR / ComfyUI_FL-Path-Animator) 설치 완료.
 
-> speed-down 대비: DiT를 `UD-Q2_K_XL`(9.5GB)로 교체하면 2.5GB 절약, 품질은 LPIPS 0.416으로 소폭 하락.
+> TE는 **GGUF로 없음**(ComfyUI-GGUF의 `TXT_ARCH_LIST`에 `gemma3`만 있고 `gemma4`는 없음).
+> 공식 README도 *"No GGUF of the LTX-2.5 encoder exists"*라고 명시 → `CLIPLoader(type=ltxv)` + w4a8 safetensors로 확정.
+> speed-down 대비: DiT를 `UD-Q2_K_XL`(8.9GB)로 교체하면 2.3GB 절약, 품질은 소폭 하락. OOM 시 즉시 전환 가능하도록 함께 받는다.
 
 ---
 
 ## 4. 추천 설계 — 5계층 Hybrid Identity-First
 
 ```
-[L0] 정체성 원본 (1회, 영구 자산 — M-B/M-C 공통)
-   MakeHuman/MPFB(CC0) 3D 인물 → 다각도 렌더 24~32장
+[L0] 정체성 원본 (1회, 영구 자산 — M-B/M-C 공통)     ← 외형은 실사만
+   실사 기준 사진 1장(카드) + 3D 포즈 가이드 24~32개
+                     ↓ Krea 2 / Qwen-Image 2.1 (드롭다운)
+   같은 사람의 실사 사진 24~32장 (AI 티 제거 프롬프트 + 얼굴 게이트)
                      ↓ kohya_ss (12GB, batch1·dim32·bf16·8bit Adam)
               char_jun.safetensors  ← "누구인지"의 단일 진실 원본
                      ↓
-   앵커 뱅크: 카드/프로필/의상/표정 컷을 PNG로 고정 (프레임 앵커 재료)
+   앵커 뱅크: 실사 카드/프로필/의상/표정 컷 PNG (프레임 앵커 재료)
+   ※ 3D는 포즈·각도 지정용으로만 쓰이고 학습 데이터에는 안 들어감
 
 [L1] Blender 풀 3D 구도 (씬별, 15초 전체 프리비즈)   ← 사용자 제안 ④
-   카메라 무빙·인물·소품·배경을 3D로 배치, 전 프레임(361프레임) 렌더
-   산출: RGB 프리비즈 + depth + instance seg + 2D/3D bbox + pose + camera json
-   → 각 객체에 고정 ID = "핀/앵커"의 3D 원본 좌표
+   카메라 무빙·인물·소품·배경의 "위치와 움직임만" 3D로 배치
+   전 프레임(361프레임)에서 depth + instance seg + 2D/3D bbox + pose + camera json 추출
+   → 각 객체에 고정 ID = "핀/앵커"의 좌표. 색·재질·외형은 만들지 않음
 
-[L2] SDXL 실사 키프레임 (샷별 대표 프레임)            ← 사용자 제안 ③
-   char_jun LoRA(고정 강도) + ControlNet(depth/pose/seg from L1)
-                     ↓  얼굴 게이트(>=0.60) 통과한 것만 채택
-   → 실사 키프레임 = LTX 앵커로 쓸 이미지
+[L2] 실사 키프레임 (샷별 대표 프레임)                 ← 사용자 제안 ③
+   모델 드롭다운: krea2(기본) | qwen21 | sdxl
+   실사 기준 앵커 + L1의 depth/pose 조건으로 인물·소품·배경 생성
+                     ↓  얼굴 게이트(>=0.60) + 육안 확인 통과한 것만 채택
+   → 실사 키프레임 = LTX 앵커로 쓸 이미지 (3D 톤이 섞이지 않음)
 
 [L3] LTX-2.5 영상화 + 프레임 앵커                    ← 사용자 제안 ①②
-   ComfyUI-GGUF: UD-Q3_K_XL DiT + Gemma4 Q4_K_M TE
+   ComfyUI-GGUF: UD-Q3_K_XL DiT + Gemma4 w4a8 TE
    + 공식 Layout-to-Render IC-LoRA(1.0) ← L1 클레이 영상이 구도 지배 (제안 ④의 완성)
    + Licon MSR V2 ← 인물/소품/배경 최대 5개를 슬롯으로 핀 (제안 ①의 완성)
    + --image first.png -1 1.0 / mid.png 36 1.0 / last.png 72 1.0  (화면 고정)
@@ -183,12 +223,13 @@ Google DeepMind의 BlenderFusion(arXiv:2506.17450) 파이프라인에서 차용�
 
 | 계층 | 왜 이렇게 하나 | 제안 축 |
 |---|---|---|
-| L0 3D → 데이터셋 | 얼굴이 다른 24장을 쓰면 LoRA도 다른 얼굴을 배운다. 3D 모델 렌더면 **같은 사람의 24각도**가 보장된다. CC0라 상업 가능 | ③ |
+| L0 실사 → 데이터셋 | 3D 렌더를 학습에 쓰면 **3D 톤을 정체성으로 배운다**. 실사 기준 사진에서 출발해 3D가 포즈만 지정한 실사 사진 24장을 만들고, 얼굴 게이트로 걸러야 진짜 같은 사람이 된다 | ③ |
 | L0 앵커 뱅크 | 프레임 앵커로 넣을 이미지를 미리 확정. 생성 중 즉흥적으로 고르지 않음 | ① |
-| L1 풀 3D | "씬마다 새로 생성"을 없앤다. 구도·위치·카메라가 15초 내내 **수치로 고정**됨. 이게 진짜 핀 | ④⑤ |
+| L1 풀 3D = 틀만 | "씬마다 새로 생성"을 없앤다. 구도·위치·카메라가 15초 내내 **수치로 고정**됨. 이게 진짜 핀. **3D는 색·재질·얼굴을 만들지 않는다** | ④⑤ |
 | L1 조건 출력 | depth/seg/bbox가 ControlNet과 LTX 조건의 입력 → Blender가 생성 모델을 "지배" | ④⑤ |
-| L2 LoRA 고정 | 시드마다 다른 얼굴이 나오던 문제가 사라짐. 후보 선택은 구도 기준으로 단순화 | ③ |
-| L2 ControlNet | 실사 키프레임도 L1 구도를 그대로 따름 → 키프레임과 영상 구도가 어긋나지 않음 | ③④ |
+| L2 모델 드롭다운 | Krea 2(사진 톤·상업 가능) / Qwen-Image 2.1(참조 10장·비상업) / SDXL(레거시)을 `--image-model`로 전환 | ③ |
+| L2 LoRA 고정 | 시드마다 다른 얼굴이 나오던 문제가 사라짐. 학습 재료는 **실사 사진**이어야 3D 톤이 안 배임 | ③ |
+| L2 3D 조건 주입 | 실사 키프레임도 L1의 depth/pose를 따름 → 키프레임과 영상 구도가 어긋나지 않음 | ③④ |
 | L3 Layout-to-Render | Blender 클레이 영상이 카메라·사물 위치를 지배. 첫 프레임이 색·조명·재질을 지정 → **별도 ControlNet 학습 불필요** | ④⑤ |
 | L3 MSR V2 슬롯 | scene 2의 0.619→0.520 드리프트는 참조 희석. 참조를 슬롯으로 고정해 경계마다 되돌림 | ① |
 | L3 multishot | 컷을 넘어 정체성 유지. 기존 D63 참조 차단 문제를 모델 수준에서 해결 | ② |
@@ -238,6 +279,8 @@ Google DeepMind의 BlenderFusion(arXiv:2506.17450) 파이프라인에서 차용�
 | Licon MSR V2 어댑터 | **Apache 2.0** | 다중 참조. 단, 기반 LTX 가중치는 위 라이선스 |
 | LTX-2 Apache Code | Apache 2.0 | 추론·학습 코드. 가중치는 별도 계약 |
 | SDXL / RealVisXL V5 | 기존 사용 중 | 계속 확인 필요 |
+| Krea 2 | Krea-2 Community License | 연매출 <$1M 무료 상업. 이상은 Enterprise 별도 계약 |
+| Qwen-Image 2.1 | **Qwen Research License** | **비상업(연구·평가) 전용.** 상업 사용 시 별도 라이선스 필요 |
 | FLUX.2 klein 4B | Apache 2.0 | 13GB → 12GB에서 양자화 검토 (예비) |
 | InsightFace antelopev2 | **비상업 연구용** | 회피 |
 | InstantID 체크포인트 | **비상업 연구용** | 미설치 |
@@ -252,9 +295,11 @@ Google DeepMind의 BlenderFusion(arXiv:2506.17450) 파이프라인에서 차용�
 
 | 항목 | 내용 | 대안 |
 |---|---|---|
-| **12GB + 22B 속도** | GGUF로 메모리는 해결됐지만 121프레임 2스테이지가 70분을 넘길 수 있음. **여전히 최대 리스크** | 49프레임 세그먼트 3개 + multishot, 또는 DiT를 `UD-Q2_K_XL`(9.5GB)로 교체. 그래도 안 되면 SDXL+AnimateDiff 백업 |
+| **12GB + 22B 속도 — 실측 완료** | GGUF Q3 + 960×544 + **25프레임 530초**. 121프레임 환산 **42.8분**, 15초(3클립) **128분** → 목표 70분 **미달**. OOM은 없었음 | ① 스테이지 해상도를 960×544→768×432로 낮추면 픽셀 0.64배 → 82분. ② Q2(8.9GB)로 교체 → 추가 단축. ③ **25프레임 세그먼트 5~6개 + 8스텝 sigmas 유지**가 가장 확실. 최종 1280×704는 VAE decoder 타일링 후 upscale 스테이지에서 처리 |
 | 텍스트 인코더 12B | GGUF Q4_K_M(7.8GB)로 다운로드·VRAM 해결. 로딩 후 CPU 오프로드 가능 | Q2_K(5.55GB)로 추가 절감 가능 |
-| 데이터셋 품질 | 3D 렌더가 실사와 거리가 있으면 LoRA가 3D 톤을 배움 | 렌더 재질·조명을 실사 키프레임 톤에 맞춤 |
+| 데이터셋 품질 | 3D 렌더를 학습에 쓰면 LoRA가 3D 톤을 배움 | **3D는 포즈만**, 학습 이미지는 실사 생성 사진으로 구성 (3차 개정 반영) |
+| AI 티 / 실사감 | 모델 기본 프롬프트로는 플라스틱 피부·과채도가 나올 수 있음 | 사진 렌즈·필름 그레인·모공 프롬프트 + 네거티브 적용, **육안 게이트 필수** |
+| Qwen-Image 2.1 라이선스 | Qwen Research License는 **비상업 전용** | 기본값은 Krea 2. Qwen은 연구·평가용으로만 실행하고 상업 산출물에 쓰지 않음 |
 | LoRA 과적합 | 표정/각도 고정 → 자연스러움 저하 | dim 32 / 15 epoch / 다양한 각도 |
 | 세그먼트 앵커 이음새 | 앵커 재주입 경계에서 깜빡임 가능 | D72의 yavg_step_ratio로 모니터 |
 | 멀티 서브젝트 | MSR V2(Apache 2.0)가 최대 5개 슬롯을 지원하지만 우리 장면에서의 안정성은 미검증 | 단일 인물 먼저 검증 후 2→5개로 확장 |
