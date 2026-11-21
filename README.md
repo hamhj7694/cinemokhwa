@@ -40,6 +40,10 @@
 | `docs/TASKS.md` | ✅ P0~P7 (55티켓) | 티켓 분해 + DoD + 게이트 매핑 |
 | `docs/AGENTS.md` · `docs/CONTEXT.md` | ⏸ 대기 | Qwen 에이전트 지침 / 세션 주입 요약 |
 | `docs/prompts/P*.md` | ⏸ 대기 | 단계별 구현 프롬프트 |
+| [`tools/contact_sheet.py`](tools/contact_sheet.py) | ✅ 신규 | **육안 판정용** — run별 3씬 대표 프레임을 한 장의 PNG 비교표로 생성 |
+
+> 육안 비교표 실행: `python tools/contact_sheet.py --runs identity-01 guided-40 guided-50`
+> (아직 `final.mp4`가 없는 run은 자동 건너뜀. 결과는 `C:\Users\mbc\mokhwa\work\contact_*.png`)
 
 ---
 
