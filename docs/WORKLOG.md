@@ -24,6 +24,7 @@
 
 | # | 티켓 | run / 시험 | 조건 | 단계별 실측 | 결과 | 상태 |
 |---|---|---|---|---|---|---|
+| 25 | P1-22 | `guided-50` (완료) | **1280×704 / 20스텝 / 3씬 / Blender 3D 도면 + 조명 고정 + 연장 미주입** | layout 4.9s(Blender) · keyframes 321.3s · clips 3088.3s · assemble 5.5s → **합계 57.0분** | `final.mp4` 1280x704 24/1 349프레임 14.54초 7.98MB. Yavg 107.24/115.73/111.53 · 선명도비율 1.035/0.748/1.154 · verify **FAIL**(PASS/FAIL/PASS). Blender 백엔드 확인됨 | ✅(수치) |
 | 24 | D70 | Blender 4.5.16 LTS 설치·백엔드 연결 | Blender vs Unity 비교 → Blender 채택(무료 GPL·오프라인·Python 자동화) | 공식 ZIP 398MB → `apps\blender-4.5.16-windows-x64\`. headless 3씬 렌더 **78초**(씬당 26초), 1280×704 PNG | 라플라시안 **5~15**(CPU 블록아웃 445 대비 30~90배 감소). `layout_backend` 기본 `blender`, `stage_key` backend 분리. `guided-50` 검증 예정 | ✅ |
 | 23 | P1-21 | `guided-40` (완료) | **1280×704 / 20스텝 / 3씬 / 조명 고정+연장 씬 레이아웃 미주입 (도면은 Blender로 덮어써짐)** | keyframes 1206.5s · clips 3334.4s · assemble 6.7s → **합계 75.8분** | `final.mp4` 1280x704 24/1 349프레임 14.54초 10.23MB. 개별 클립은 전부 PASS였으나 **씬 간 밝기 차이 81.97 → D71 신규 검사에서 FAIL로 재판정**(Yavg 34/35/116). 어두운 시드 선택 문제 확인 → D71 수정 적용해 guided-50 재진행 | ⚠️(밝기) |
 | 22 | P1-20 | `guided-30` (중단) | **1280×704 / 20스텝 / 조명·장소 고정 프롬프트** | 키프레임 1장 생성 후 중단 | guided-40이 조명 수정 + 연장 수정을 모두 포함하므로 중복 run 폐기 | ⏹ |

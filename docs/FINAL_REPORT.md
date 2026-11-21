@@ -39,7 +39,7 @@ D66 ①(정면 카드)·P1-16(컷/연장 검증)을 main에 커밋·푸시했고
 | `guided-40` (중간 검증) | ⚠️ 완료 | 75.8분. 개별 클립 PASS였으나 **씬 간 밝기 차이 81.97 → FAIL**(Yavg 34/35/116). 숫자 PASS만으로 통과 불가 확인 |
 | D71 밝기 일관성 | ✅ | main `5e6889d` — verify에 씬 간 밝기 검사(WARN 25/FAIL 50) 추가, 키프레임 후보 선택에 밝기 기준 반영 |
 | D70 Blender 백엔드 | ✅ | main `5a3c151` — 4.5.16 LTS 설치, 3씬 렌더 78초, 라플라시안 5~15 |
-| `guided-50` (Blender 검증) | ⏳ 대기 | guided-40 종료 후 자동 시작. **Blender 최종 판정 대상** |
+| `guided-50` (Blender 검증) | ✅ 완료 | 57.0분, verify **FAIL**, Yavg 107.24/115.73/111.53, 비율 1.035/0.748/1.154, Blender 백엔드 확인 |
 | Q9 정교 3D 모델 | ⏹ 조사 완료 | Hunyuan3D 한국 제외 / TRELLIS.2 의존성 제약 → 부적합, 설치 안 함(D69) |
 
 ---
@@ -52,7 +52,8 @@ D66 ①(정면 카드)·P1-16(컷/연장 검증)을 main에 커밋·푸시했고
 | 2 | **② After 저해상도** (832×480/6스텝, 구버전 도면) | `C:\Users\mbc\mokhwa\work\guided-01\final.mp4` — 14.54초 / 7.47MB. 라벨 번짐 있어 참고용 |
 | 3 | **③ After 본검증** (1280×704/20스텝, 수정 도면) | `C:\Users\mbc\mokhwa\work\guided-20\final.mp4` — 라벨 번짐 해결. scene 2 선명도 FAIL |
 | 4 | **④ 최종 검증** (1280×704/20스텝, 조명 고정+연장 수정) | `C:\Users\mbc\mokhwa\work\guided-40\final.mp4` — 생성 중. **최종 판정 대상** |
-| 5 | 3D 구도 도면 | `C:\Users\mbc\mokhwa\work\guided-40\layouts\layout_01~03.png` — 라벨 제거된 수정본 |
+| 5 | 3D 구도 도면 (CPU) | `C:\Users\mbc\mokhwa\work\guided-40\layouts\layout_01~03.png` — 라벨 제거된 수정본 |
+| 6 | **⑤ Blender 최종** (1280×704/20스텝) | `C:\Users\mbc\mokhwa\work\guided-50\final.mp4` — Blender 3D 도면 적용. **최종 판정 대상** |
 
 > **비교 포인트**: ①에서 얼굴/배경이 바뀌던 컷이 고정되는지, 그리고 **세 장면의 골목 밝기가 같은지** 보면 됩니다.
 > ②는 라벨 번짐, ③은 연장 씬 간섭, ④는 씬 간 밝기 차이(81.97)가 있어 **최종 판정은 ⑤ guided-50**으로 해주세요.
