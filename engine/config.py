@@ -58,7 +58,7 @@ class Config:
     # 블록아웃을 구도 잠재로 넣을 때의 denoise. 낮을수록 도면 색이 남고,
     # 높을수록 구도 힌트만 남고 실사로 다시 칠해진다(육안 확인 후 조절).
     layout_denoise: float = field(
-        default_factory=lambda: float(os.environ.get("CINEMOKHWA_LAYOUT_DENOISE", "0.55"))
+        default_factory=lambda: float(os.environ.get("CINEMOKHWA_LAYOUT_DENOISE", "0.70"))
     )
 
     # --- 모델 파일명 (ENVIRONMENT §3.1) ---

@@ -43,7 +43,7 @@ DOLLY = re.compile(r"\b(dolly|push in|tracking|following|advance|moves? forward)
 C_SKY_TOP = (24, 28, 38)
 C_SKY_BOT = (52, 58, 72)
 C_GROUND = (44, 48, 58)
-C_GRID = (72, 78, 92)
+C_GRID = (48, 53, 65)   # 배경에 가까운 낮은 대비 — 선이 실사로 번지지 않게
 C_BLOCK = (86, 104, 138)
 C_BLOCK_EDGE = (130, 152, 190)
 C_FIGURE = (236, 150, 84)
@@ -215,15 +215,17 @@ def render(s: Scene3D, w: int = 1280, h: int = 704) -> Image.Image:
             px[x, y] = c
     draw = ImageDraw.Draw(img, "RGBA")
 
-    # 바닥 + 원근 그리드
+    # 바닥 + 원근 그리드 — 구도 힌트만 남기고 고주파 선은 최소화한다.
+    # 2026-11-21 수정: 그리드가 img2img 잠재에 번져 실사 키프레임에 선이 남는 문제(라플라시안 893→757) 발견.
+    # 간격을 넓히고 색을 배경에 가깝게 낮춰 "원근감만" 전달한다.
     horizon = project((0.0, 0.0, 200.0), s.camera, w, h)
     if horizon:
-        draw.line([(0, horizon[1]), (w, horizon[1])], fill=C_HORIZON, width=2)
-    for z in range(0, 34, 2):
+        draw.line([(0, horizon[1]), (w, horizon[1])], fill=C_HORIZON, width=1)
+    for z in range(0, 34, 4):
         a, b = project((-12.0, 0.0, float(z)), s.camera, w, h), project((12.0, 0.0, float(z)), s.camera, w, h)
         if a and b:
             draw.line([(a[0], a[1]), (b[0], b[1])], fill=C_GRID, width=1)
-    for x in range(-12, 13, 2):
+    for x in range(-12, 13, 4):
         a, b = project((float(x), 0.0, 0.0), s.camera, w, h), project((float(x), 0.0, 32.0), s.camera, w, h)
         if a and b:
             draw.line([(a[0], a[1]), (b[0], b[1])], fill=C_GRID, width=1)
@@ -244,7 +246,7 @@ def render(s: Scene3D, w: int = 1280, h: int = 704) -> Image.Image:
         front = [pts[i] for i in (4, 5, 6, 7)]
         draw.polygon([(p[0], p[1]) for p in front], fill=blk.color + (200,))
         for i, j in ((4, 5), (5, 6), (6, 7), (7, 4), (0, 4), (1, 5), (2, 6), (3, 7)):
-            draw.line([(pts[i][0], pts[i][1]), (pts[j][0], pts[j][1])], fill=C_BLOCK_EDGE, width=2)
+            draw.line([(pts[i][0], pts[i][1]), (pts[j][0], pts[j][1])], fill=C_BLOCK_EDGE, width=1)
 
     # 인물 — 발/머리 투사 + 몸통 두께. heading은 색/원으로 구분.
     for fig in sorted(s.figures, key=lambda f: -f.pos[2]):
@@ -257,15 +259,10 @@ def render(s: Scene3D, w: int = 1280, h: int = 704) -> Image.Image:
         draw.line([(foot[0], foot[1]), (head[0], head[1])], fill=fig.color, width=thick)
         r = max(5, int(26.0 / head[2]))
         draw.ellipse([head[0] - r, head[1] - r, head[0] + r, head[1] + r], fill=C_HEAD)
-        if fig.heading > 1.0:  # 뒷모습 표시용 작은 원
-            draw.ellipse([head[0] - r // 2, head[1] - r // 2, head[0] + r // 2, head[1] + r // 2],
-                         outline=(60, 40, 30), width=2)
+        # heading은 색으로만 표현(C_FIGURE_BACK). 작은 원은 고주파라 제거함.
 
-    # 상단 라벨 — 디버깅용, 실사 변환 시 프롬프트에 구도 힌트가 된다.
-    draw.rectangle([0, 0, w, 30], fill=(18, 20, 28, 210))
-    draw.text((10, 8), f"scene {s.scene_id:02d}  depth={s.features.get('depth')}m  "
-              f"{'wide' if s.features.get('wide') else 'close' if s.features.get('close') else 'mid'}  "
-              f"{'behind' if s.features.get('behind') else 'front'}", fill=(220, 226, 238))
+    # 상단 디버그 라벨 제거 — 이게 img2img 잠재에 번져 실사에 검은 띠로 남았다.
+    # 구도 힌트는 features(메타/프롬프트)로 전달하고, 참조 이미지는 실루엣만 담는다.
     return img
 
 
@@ -284,6 +281,7 @@ def stage_key(project: project_mod.Project, scene: dict, sequence: int = 0) -> s
             "camera": asdict(s.camera),
             "figures": [asdict(f) for f in s.figures],
             "blocks": [asdict(b) for b in s.blocks],
+            "render_version": 2,  # 그리드/라벨 제거 반영 — 이전 캐시 무효화
         }
     )
 
