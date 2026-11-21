@@ -16,7 +16,7 @@ from pathlib import Path
 
 from .errors import CineError
 
-STAGES = ("script", "keyframes", "clips", "assemble")
+STAGES = ("script", "characters", "keyframes", "clips", "assemble")
 
 
 def now() -> str:
@@ -50,6 +50,11 @@ class Project:
     @property
     def script_path(self) -> Path:
         return self.dir / "script.json"
+
+    @property
+    def references(self) -> Path:
+        """D66 ① — 인물별 정면 기준 이미지가 들어가는 폴더."""
+        return self.dir / "references"
 
     @property
     def keyframes(self) -> Path:
@@ -97,8 +102,19 @@ class Project:
         bible = raw.get("bible")
         if not isinstance(bible, dict):
             return {"characters": [], "places": [], "look": ""}
+        chars: list[dict] = []
+        for item in bible.get("characters") or []:
+            if not isinstance(item, dict):
+                continue
+            entry = {
+                "id": str(item.get("id") or ""),
+                "desc": str(item.get("desc") or ""),
+            }
+            if item.get("ref"):  # D66 ① — 캐릭터 카드 상대 경로
+                entry["ref"] = str(item["ref"])
+            chars.append(entry)
         return {
-            "characters": bible.get("characters") or [],
+            "characters": chars,
             "places": bible.get("places") or [],
             "look": str(bible.get("look") or ""),
         }
@@ -166,7 +182,7 @@ def create(
             f"이미 존재하는 실행입니다: {run_id}",
             hint="이어서 하려면 --run-id, 새로 만들려면 다른 run_id를 쓰세요.",
         )
-    for sub in ("keyframes", "clips", "frames"):
+    for sub in ("references", "keyframes", "clips", "frames"):
         (d / sub).mkdir(parents=True, exist_ok=True)
 
     data = {
@@ -240,6 +256,10 @@ def reset(project: Project, stages: list[str] | None = None) -> list[str]:
         if stage == "script" and project.script_path.exists():
             project.script_path.unlink()
             removed.append(str(project.script_path))
+        elif stage == "characters" and project.references.exists():
+            for p in project.references.glob("*.png"):
+                p.unlink()
+                removed.append(str(p))
         elif stage == "keyframes" and project.keyframes.exists():
             for p in project.keyframes.glob("*.png"):
                 p.unlink()

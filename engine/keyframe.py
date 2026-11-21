@@ -199,15 +199,21 @@ def stage_key(
     *,
     ref_target: int | None = None,
     ref_digest: str | None = None,
+    ref_card: str | None = None,
 ) -> str:
     """키프레임 캐시 키.
 
-    `ref_target`(장면 id)을 주면 파일 해시 대신 **대상 장면 id**를 쓴다. 같은 실행 안에서
-    앞 장면의 키프레임이 아직 없을 때도 키가 안정적이기 때문이다. 대상이 이번 실행에서
-    다시 생성되지 않는 경우(예: `--scene 3`)에만 `ref_digest`로 내용 변화를 반영한다.
+    `ref_target`(앞 장면 id)을 주면 파일 해시 대신 **대상 장면 id**를 쓴다. 같은 실행
+    안에서 앞 장면 키프레임이 아직 없을 때도 키가 안정적이기 때문이다. 대상이 이번
+    실행에서 다시 생성되지 않을 때(예: `--scene 3`)만 `ref_digest`로 내용을 반영한다.
+
+    D66 ①: `ref_card`(`char:<id>`)를 주면 캐릭터 카드를 참조한다는 뜻이다. 카드는
+    키프레임보다 먼저 만들어지므로 파일 해시를 쓸 수 있고, 카드가 바뀌면 키도 바뀐다.
     """
-    if ref_target is not None:
-        ref_part: object = {"target": int(ref_target), "digest": ref_digest or ""}
+    if ref_card is not None:
+        ref_part: object = {"card": str(ref_card), "digest": ref_digest or ""}
+    elif ref_target is not None:
+        ref_part = {"target": int(ref_target), "digest": ref_digest or ""}
     else:
         ref_part = project_mod.file_digest(reference) if reference else "none"
     return project_mod.digest(
@@ -221,7 +227,11 @@ def stage_key(
             "style": project.style,
             "ckpt": cfg.sdxl_ckpt,
             "ref": ref_part,
-            "ref_mode": cfg.kf_reference if (reference or ref_target is not None) else "none",
+            "ref_mode": (
+                cfg.kf_reference
+                if (reference or ref_target is not None or ref_card is not None)
+                else "none"
+            ),
         }
     )
 

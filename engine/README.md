@@ -37,18 +37,19 @@ M-B(2D 셀)·M-C(3D)·T0는 각각 P2.5 / P3.5 / P1.5에서 이 패키지 옆에
 | `comfy.py` | ComfyUI HTTP | `/prompt` · `/history` · `/upload/image` · `/free` |
 | `project.py` | run 디렉터리·state·재개 | `done(stage,key)` = 상태 AND 입력 해시 일치 |
 | `script.py` | 대본 JSON (gemma4:12b) | 1회 교정 후 실패하면 중단(임의 생성 금지) · `bible`/`shot`/`anchors` 검증 |
-| `keyframe.py` | SDXL 4시드 → 최고 선택 | 중앙 40% 라플라시안 분산 · 앵커 프롬프트 · 컷 장면은 IPAdapter/img2img 참조 |
+| `character.py` | **D66 ① 정면 카드** | `references/char_<id>.png` · `bible.characters[].ref` · 컷 참조 1순위 |
+| `keyframe.py` | SDXL 4시드 → 최고 선택 | 중앙 40% 라플라시안 분산 · 앵커 프롬프트 · 컷 장면은 카드/앞 키프레임 IPAdapter·img2img 참조 |
 | `i2v.py` | Wan I2V → PNG 마스터 → CRF16 | `length=4k+1` · shift 8 · fp8 · 같은 `shot`은 마지막 프레임에서 연장 |
 | `assemble.py` | 인코딩·크로스페이드·타임라인 | `sum(d) - crossfade×(n-1)` · `timeline`에 `shot` |
 
-## 장면 간 일관성 (D63~D65)
+## 장면 간 일관성 (D63~D66)
 
 두 축으로 나눈다. **연장은 픽셀, 컷은 앵커.**
 
 | 축 | 트리거 | 수단 |
 |---|---|---|
 | 연장 | 앞 장면과 `shot`이 같다 | 앞 클립 **마지막 PNG**를 다음 클립 `start_image`로 넣는다 |
-| 컷 | `shot`이 다르다 | **bible 앵커**(`char:`/`place:` + `look`)를 키프레임 프롬프트에 주입하고, 앞 장면 **키프레임을 참조 이미지로** 넣는다 |
+| 컷 | `shot`이 다르다 | **bible 앵커**(`char:`/`place:` + `look`)를 키프레임 프롬프트에 주입하고, **인물 정면 카드**(D66 ①)를 참조 이미지로 넣는다. 카드가 없으면 앞 장면 키프레임으로 폴백(D64) |
 
 `script.json`(`schema: 2`)이 이 정보를 담는다.
 
@@ -87,30 +88,61 @@ M-B(2D 셀)·M-C(3D)·T0는 각각 P2.5 / P3.5 / P1.5에서 이 패키지 옆에
 모델은 시작 이미지를 거의 그대로 재현한다(MAE 1.17 / 1.30). 그래서 **시작점을 정확히
 마지막 프레임에 두는 것**이 가장 중요한 변수이고, 겹침은 정렬 오차만 더한다.
 
-### 컷 사이 참조 주입 (D64)
+### 인물 정면 카드 (D66 ① — 사용자 승인 2026-11-17)
 
-`shot`이 바뀌는 장면은 픽셀을 잇지 않는다. 대신 **그 인물이 나온 가장 가까운 앞
-장면의 키프레임**을 SDXL 키프레임 생성에 참조로 넣는다.
+`shot`이 바뀌는 컷은 픽셀을 잇지 않는다. 예전엔 "그 인물이 나온 가장 가까운 앞
+장면의 키프레임"을 참조로 썼는데(D64), 그 장면이 **뒷모습·원경**이면 얼굴 정보가
+없어 인물이 바뀌었다(육안 FAIL). 이제 bible의 인물마다 **정면 기준 카드**를 한 장
+만들어 모든 컷이 그걸 참조한다.
 
 | 항목 | 값 |
 |---|---|
-| 대상 | 컷 장면 중 `char:` 앵커가 있는 장면. 연장(같은 `shot`)은 체이닝이 대신하므로 참조 없음 |
-| 참조 선택 | 앞 장면을 역순으로 훑어 `char:` 앵커가 겹치는 첫 장면의 키프레임(없으면 그 클립 첫 프레임) |
-| 1순위 | `IPAdapterUnifiedLoader`(`PLUS (high strength)`) → `IPAdapterAdvanced` (weight 0.8, linear, V only) |
-| 폴백 | 같은 시드에서 `LoadImage` → `ImageScale` → `VAEEncode` → `KSampler(denoise 0.55)` |
+| 대상 | `bible.characters[]` 전부. 2단계(캐릭터 카드)에서 4시드 → 중앙 선명도 최고로 생성 |
+| 저장 | `work/<run>/references/char_<id>.png` + `bible.characters[].ref`에 상대경로 기록 |
+| 프롬프트 | `desc` + `front-facing portrait, looking directly at camera, neutral expression, centered head and shoulders, even soft frontal lighting, plain neutral background` + 화풍 |
+| 네거티브 | 기본 + `side view, profile, back view, turned away, face obscured` |
+| 컷 참조 1순위 | 인물 앵커(`char:`)가 있는 **컷** 장면은 이 카드를 IPAdapter로 주입 |
+| 연장 | 같은 `shot`이면 카드를 쓰지 않고 D65 체이닝 유지(구도 보존) |
+| 폴백 | 카드가 없으면 D64 규칙(앞 장면 키프레임)으로 되돌아감 |
+| 생성 재사용 | 새 모델·API 없이 `keyframe.build_workflow`의 SDXL 4시드 그대로 사용(D39/D47) |
 | 끄기 | `CINEMOKHWA_KF_REF=none` (또는 `img2img`로 고정) |
-| 캐시 | 참조 **대상 장면 id** + 방식이 키프레임 캐시 키에 들어간다(같은 실행에서 앞 키프레임이 아직 없어도 키가 안정). 이번 실행에 포함되지 않은 대상만 파일 해시를 더한다 |
+| 캐시 | `character.stage_key()` — 인물 desc·화풍·ckpt·스텝·크기·시드가 바뀌면 카드 재생성 |
 
-실측(832×480/8스텝, 같은 프롬프트·같은 시드):
+실측(832×480/32스텝):
 
 | 확인 | 값 | 의미 |
 |---|---|---|
-| IPAdapter가 출력에 주는 영향 | w0.0 vs w1.0 **MAE 54.82** | 노드가 무시되지 않고 실제로 반영됨 |
-| 폴백 | 프리셋을 일부러 깨뜨림 → `COMFY-002` → img2img로 성공 | 자동 폴백 동작 |
-| 소요 | 키프레임 1장 5~20초(모델 로드 포함) · 4시드 × 3씬 **3분 41초**(참조 포함, 832×480/32스텝) | 4시드 × 3씬 ≈ 2~4분 |
+| 카드 1장 생성 | **65.2초**(4시드), 551KB | 초기 1회 비용, 이후 캐시 |
+| 3씬 키프레임 | **246.0초** — scene 1·3은 `char:jun`(카드), scene 2는 `none`(연장) | 카드 참조가 실제 배선됨 |
+| 컷 1↔3 팔레트 거리 | **21.5** (0~100, 낮을수록 같음) | 같은 카드 참조가 색감 통일에 기여 |
+| IPAdapter 영향(과거) | w0.0 vs w1.0 **MAE 54.82** | 노드가 무시되지 않고 실제 반영됨 |
+| 폴백(과거) | 프리셋을 깨뜨림 → `COMFY-002` → img2img 성공 | 자동 폴백 동작 |
+
+### 참조 주입 방식 (D64 — 카드/키프레임 공통)
+
+| 항목 | 값 |
+|---|---|
+| 1순위 | `IPAdapterUnifiedLoader`(`PLUS (high strength)`) → `IPAdapterAdvanced` (weight 0.8, linear, V only) |
+| 폴백 | 같은 시드에서 `LoadImage` → `ImageScale` → `VAEEncode` → `KSampler(denoise 0.55)` |
+| 캐시키 | 카드는 내용 해시(`ref_card`), 키프레임 폴백은 **대상 장면 id** + 방식이 캐시 키에 들어간다 |
 
 인물 동일성은 수치로 판정하지 않는다. 픽셀 MAE는 구도가 달라지면 의미가 없고,
-PRD §13.5와 같이 **육안 판정**이 우선이다. 파이프라인은 "참조가 실제로 쓰였는가"까지만 보증한다.
+PRD §13.5와 같이 **육안 판정**이 우선이다. 파이프라인은 "참조가 실제로 쓰였는가"까지만
+보증한다. ①로도 얼굴이 다르면 ③ FaceID/InstantID는 라이선스 확인 후 별도 승인(D66).
+
+### 수치 검증 — `mokhwa verify` (P1-16)
+
+`shot`으로 **컷/연장을 구분**해 기준을 다르게 적용한다. 육안 판정을 대체하지 않고
+"어디를 볼지"만 가리킨다(ENVIRONMENT §6 — 항상 중앙 40%).
+
+| 경계 | 비교 기준 | 지표 | PASS |
+|---|---|---|---|
+| 연장(같은 shot) | **앞 클립 마지막 PNG** | 이음새 MAE | < 3.0 |
+| 컷(새 shot) | 자기 키프레임(카드 참조 포함) | SSIM + 팔레트 L1 | SSIM ≥ 0.30 & 팔레트 ≤ 30 |
+| 공통 | 클립 첫↔끝 프레임 | 드리프트 | < 30 (초과 WARN) |
+
+> 예전엔 모든 장면을 자기 키프레임과 비교해 연장 장면을 오판했다(MAE 40.19 → FAIL).
+> P1-16 이후 연장은 앞 클립 끝과 1.48로 PASS, 드리프트만 WARN으로 분리 보고된다.
 
 ## 고정 규격 (바꾸지 말 것)
 
@@ -127,18 +159,22 @@ PRD §13.5와 같이 **육안 판정**이 우선이다. 파이프라인은 "참�
 `work/<run_id>/state.json`에 단계별 `{status, key, started, finished, seconds}`를 남긴다.
 `key`는 그 단계 입력의 sha1이다.
 
+5단계: **script → characters → keyframes → clips → assemble**.
+
 | 바꾼 것 | 다시 도는 단계 |
 |---|---|
 | 주제·길이·화풍·LLM | script → 이후 전부 |
 | `SYSTEM` 프롬프트·스키마 | script → 이후 전부 |
-| bible·anchors | keyframes → clips → assemble |
-| 참조 이미지(`char:` 앞 장면 내용)·`CINEMOKHWA_KF_REF` | keyframes → clips → assemble |
+| bible 인물 `desc`(카드 프롬프트) | characters → keyframes → clips → assemble |
+| bible 장소·`look`·anchors | keyframes → clips → assemble |
+| 캐릭터 카드 내용·`CINEMOKHWA_KF_REF` | keyframes → clips → assemble |
 | `shot` 배치(어떤 씬이 연장인지) | clips → assemble |
 | visual 프롬프트 | keyframes → clips → assemble |
 | motion 프롬프트·스텝 | clips → assemble |
 | 크로스페이드·CRF | assemble |
 
-`state.json`의 `keyframes.items[]`에는 장면별 선택 시드·선명도·참조 방식·`elapsed`,
+`state.json`의 `characters.items[]`에는 인물별 카드 파일·선택 시드·선명도,
+`keyframes.items[]`에는 장면별 선택 시드·선명도·참조 방식(`char:<id>` / 앞 장면 id / none)·`elapsed`,
 `clips.items[]`에는 프레임 수·재생 길이·`overlap`·`seam_mae`·`gen_seconds`·`elapsed`가 남는다.
 run 단위 요약은 `docs/WORKLOG.md`에 1행으로 적는다(TASKS §0 규칙 8).
 
