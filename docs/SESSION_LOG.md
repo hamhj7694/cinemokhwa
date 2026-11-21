@@ -83,6 +83,8 @@ main 푸시 범위: `482f99e..36677de`. feature 브랜치는 `origin/feature/3d-
 - [x] 기획 3안 기록 + 방향 결정
 - [x] 브랜치 생성 + 기능 단위 구현/커밋/푸시 (feature 2개)
 - [x] 오프라인 테스트 ALL PASS + CPU 스모키(3씬 0.18초)
-- [ ] ComfyUI 실 스모키(`guided-01`) → feature main 병합
-- [ ] `identity-01` 완료 → verify → 최종 보고서 최신화
-- [ ] WORKLOG 커밋 `cfe5ef9` 반영(스모키 실측·본 렌더 중간 실측)
+- [x] ComfyUI 실 스모키(`guided-01`) — 이중 참조 주입 로그 확인, main 병합 완료(`a346321`)
+- [x] `identity-01` 완료 → verify 종합 WARN(FAIL 없음) → WORKLOG 실측 입력
+- [x] 레이아웃 라벨 번짐 진단·수정(`ff7031a`) — guided-20은 수정 코드로 재대기
+- [ ] `guided-01` 완료 → verify → WORKLOG 입력
+- [ ] `guided-20`(20스텝/수정 도면) 완료 → **사용자 최종 육안 판정**

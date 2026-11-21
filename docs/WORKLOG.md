@@ -24,7 +24,8 @@
 
 | # | 티켓 | run / 시험 | 조건 | 단계별 실측 | 결과 | 상태 |
 |---|---|---|---|---|---|---|
-| 17 | P1-18 · P1-19 | `guided-01` (진행) | **832×480 / 6스텝 / 3씬 / 3D 레이아웃+카드 이중 참조** | script 캐시 · cards 0s(복사) · layout **0s(3씬, CPU)** · keyframes 진행 중(1씬 `ipadapter char:jun` + `layout_01.png` 확인) | `identity-01` 종료 직후 자동 시작(12:42:38). 키프레임 로그에 **정체성+3D 구도 동시 주입 확인**. 완료 후 소요·verify 입력 | 🔄 |
+| 18 | D67 결함 수정 | 레이아웃 라벨 번짐 진단 | `guided-01` 키프레임 vs `identity-01` | guided 키프레임 라플라시안 **757.4**(기존 72.4), y=30 명도 급변 **45→62**(기존 완만 107→104) | 도면 상단 디버그 라벨 바가 img2img 잠재에 번진 것 확정. 라벨 제거·그리드 축소·denoise 0.70 상향(`ff7031a`), guided-20은 수정 코드로 재대기 | ✅ |
+| 17 | P1-18 · P1-19 | `guided-01` (진행) | **832×480 / 6스텝 / 3씬 / 3D 레이아웃+카드 이중 참조** | script 캐시 · cards 0s(복사) · layout **0s(3씬, CPU)** · keyframes **56.0s**(1·3=`char:jun`+레이아웃, 2=레이아웃만) · clips 진행(1씬 3분17초) | `identity-01` 종료 직후 자동 시작(12:42:38). **정체성+3D 구도 동시 주입 실 ComfyUI 확인**. 단, 구버전 도면(라벨 있음) 사용 → 라벨 번짐 발견, 20스텝 본 검증은 수정 도면 적용 | 🔄 |
 | 16 | D67 실 스모키 | `refpipe-01/layouts` | 결정론적 3D 블록아웃 3씬 | `layout_01/02/03.png` 생성 **0.18초**(CPU만) | scene 1 `wide/dolly depth=11.0`, scene 2 `closer/behind depth=4.15`, scene 3 `close depth=3.0`. 파일 12~14KB. 이중 참조 워크플로 3씬 빌드 검증(1·3=IPAdapter+레이아웃, 2=레이아웃만) ALL PASS | ✅ |
 | 15 | D67 오프라인 | `tests/test_layout3d.py` | 결정성·투사·캐시·Blender export·이중참조 노드 | — | 8개 검증 ALL PASS. `py_compile cli.py engine/*.py` 통과 | ✅ |
 
