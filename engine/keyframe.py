@@ -22,6 +22,24 @@ from .script import KEYFRAME_NEGATIVE, STYLES, anchor_text
 SEEDS = (101, 202, 303, 404)
 _REGION = 0.4
 
+# D71: 선명도만 보고 고르면 4시드 중 유난히 어두운 것이 선택돼 씬 간 밝기가 갈린다.
+# P0/guided-20 실측 정상 노출(~105)을 기준으로, 충분히 선명한 후보 중
+# 목표 밝기에 가장 가까운 것을 고른다.
+TARGET_YAVG = 105.0
+SHARP_POOL_RATIO = 0.60   # 최고 중앙 선명도의 60% 이상만 후보 유지
+
+
+def choose_candidate(candidates: list[dict]) -> dict:
+    """D71 — 충분히 선명한 후보 중 목표 밝기에 가장 가까운 시드를 고른다.
+
+    선명도만 보면 4시드 중 유난히 어두운 것이 선택되는 경우가 있어
+    씬 간 밝기가 갈린다(guided-40 실측 Yavg 34/35/116).
+    """
+    assert candidates
+    max_center = max(c["center"] for c in candidates)
+    pool = [c for c in candidates if c["center"] >= max_center * SHARP_POOL_RATIO] or candidates
+    return min(pool, key=lambda c: (abs(c["yavg"] - TARGET_YAVG), -c["center"]))
+
 
 def prompt_for(project: project_mod.Project, scene: dict) -> str:
     """bible 앵커 + 화면 설명 + 화풍. 앵커가 인물·장소·조명을 씬 사이에 고정한다.
@@ -271,6 +289,7 @@ def stage_key(
             "visual": scene["visual"],
             "anchors": anchor_text(project.bible(), list(scene.get("anchors") or [])),
             "seeds": SEEDS,
+            "selection_version": "d71-brightness",  # 후보 선택 로직 변경 시 캐시 무효화
             "steps": cfg.keyframe_steps,
             "size": [cfg.width, cfg.height],
             "style": project.style,
@@ -313,7 +332,7 @@ def generate(
 
     prompt = prompt_for(project, scene)
     t0 = time.time()
-    best: tuple[Path, int, float] | None = None
+    paths: dict[int, Path] = {}
     candidates: list[dict] = []
     used_mode = "none"
     modes = []
@@ -359,16 +378,26 @@ def generate(
                 f"키프레임 산출물이 없습니다 (장면 {scene['id']}, 시드 {seed})",
             )
         full, center = _laplacian_var(files[0])
-        candidates.append({"seed": seed, "center": round(center, 1), "full": round(full, 1)})
-        if best is None or center > best[2]:
-            best = (files[0], seed, center)
+        with Image.open(files[0]) as im:
+            arr = np.asarray(im.convert("RGB"), dtype=np.float32)
+        yavg = float((0.299 * arr[:, :, 0] + 0.587 * arr[:, :, 1]
+                      + 0.114 * arr[:, :, 2]).mean())
+        paths[seed] = files[0]
+        candidates.append({
+            "seed": seed, "center": round(center, 1),
+            "full": round(full, 1), "yavg": round(yavg, 1),
+        })
 
-    assert best is not None
+    chosen = choose_candidate(candidates)
+    best = (paths[chosen["seed"]], chosen["seed"], chosen["center"])
+
     dest.parent.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(best[0], dest)
     meta = {
         "seed": best[1],
         "center_sharpness": round(best[2], 1),
+        "selected_yavg": chosen["yavg"],
+        "selection": "sharpness_pool+brightness",
         "candidates": candidates,
         "file": dest.name,
         "reference": reference_label,

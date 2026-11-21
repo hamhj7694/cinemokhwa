@@ -583,6 +583,11 @@ def cmd_verify(args: argparse.Namespace) -> int:
         say("  FAIL = 결함 가능성. 해당 장면 재생성 권장:")
         say(f"    .\\mokhwa.cmd make --run-id {project.run_id} --scene N --force")
 
+    if result.get("cross_scene_yavg_verdict") != "PASS":
+        say("")
+        say(f"씬 간 밝기 차이 {result.get('cross_scene_yavg_spread')} "
+            f"→ {result['cross_scene_yavg_verdict']} (한 공간처럼 보이지 않을 수 있음)")
+
     say("")
     say(f"저장: {result['_path']}")
     say(f"종합: {result['overall']}")

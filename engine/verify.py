@@ -43,6 +43,10 @@ SSIM_WARN = 0.15
 PALETTE_PASS = 30.0       # 팔레트(8단계 RGB 히스토그램) L1 거리, 0~100
 PALETTE_WARN = 50.0
 DRIFT_WARN = 30.0         # 클립 첫↔끝 프레임 차이(움직임에 따른 자연 변화)
+# 씬 간 밝기 일관성 — 사용자의 핵심 불만("1·2는 밝고 3은 어두워 다른 공간 같다").
+# 컷 내 yavg_std만으로는 잡히지 않으므로 run 전체의 yavg_mean 최대-최소를 본다(D71).
+CROSS_YAVG_WARN = 25.0    # 25 초과 → WARN
+CROSS_YAVG_FAIL = 50.0    # 50 초과 → FAIL
 
 WIDE_PATTERN = re.compile(
     r"\b(wide|long shot|extreme wide|establishing|from behind|behind her|"
@@ -353,13 +357,29 @@ def run(cfg: Config, project, *, sample_every_note: bool = True) -> dict:
             hint=f"3단계(클립)를 먼저 실행하세요: {project.dir}",
         )
 
+    # D71: 씬 간 밝기 일관성. 개별 클립은 PASS여도 전체가 어둡/밝음으로 갈리면
+    # "같은 공간처럼 보이지 않는다"는 사용자 불만이 재발한다.
+    yavgs = [r["yavg_mean"] for r in rows if r.get("yavg_mean") is not None]
+    spread = round(max(yavgs) - min(yavgs), 2) if len(yavgs) >= 2 else 0.0
+    if spread > CROSS_YAVG_FAIL:
+        cross_verdict = "FAIL"
+    elif spread > CROSS_YAVG_WARN:
+        cross_verdict = "WARN"
+    else:
+        cross_verdict = "PASS"
+
     summary = {
         "run_id": project.run_id,
         "expected_frames": cfg.frames(cfg.clip_seconds),
         "sample_every": SAMPLE_EVERY,
+        "cross_scene_yavg_spread": spread,
+        "cross_scene_yavg_verdict": cross_verdict,
         "clips": rows,
         "overall": overall(
-            {f"{r['scene']}:{k}": v for r in rows for k, v in r["verdicts"].items()}
+            {
+                **{f"{r['scene']}:{k}": v for r in rows for k, v in r["verdicts"].items()},
+                "cross_scene_brightness": cross_verdict,
+            }
         ),
     }
     project.dir.joinpath("metrics.json").write_text(
