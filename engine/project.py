@@ -16,7 +16,7 @@ from pathlib import Path
 
 from .errors import CineError
 
-STAGES = ("script", "characters", "keyframes", "clips", "assemble")
+STAGES = ("script", "characters", "layout", "keyframes", "clips", "assemble")
 
 
 def now() -> str:
@@ -55,6 +55,11 @@ class Project:
     def references(self) -> Path:
         """D66 ① — 인물별 정면 기준 이미지가 들어가는 폴더."""
         return self.dir / "references"
+
+    @property
+    def layouts(self) -> Path:
+        """D67 — 결정론적 3D 블록아웃이 들어가는 폴더."""
+        return self.dir / "layouts"
 
     @property
     def keyframes(self) -> Path:
@@ -182,7 +187,7 @@ def create(
             f"이미 존재하는 실행입니다: {run_id}",
             hint="이어서 하려면 --run-id, 새로 만들려면 다른 run_id를 쓰세요.",
         )
-    for sub in ("references", "keyframes", "clips", "frames"):
+    for sub in ("references", "layouts", "keyframes", "clips", "frames"):
         (d / sub).mkdir(parents=True, exist_ok=True)
 
     data = {
@@ -258,6 +263,10 @@ def reset(project: Project, stages: list[str] | None = None) -> list[str]:
             removed.append(str(project.script_path))
         elif stage == "characters" and project.references.exists():
             for p in project.references.glob("*.png"):
+                p.unlink()
+                removed.append(str(p))
+        elif stage == "layout" and project.layouts.exists():
+            for p in project.layouts.glob("*.png"):
                 p.unlink()
                 removed.append(str(p))
         elif stage == "keyframes" and project.keyframes.exists():

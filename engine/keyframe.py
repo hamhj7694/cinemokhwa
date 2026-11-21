@@ -97,11 +97,15 @@ def build_workflow(
     prefix: str,
     *,
     reference: tuple[str, str] | None = None,
+    layout: str | None = None,
 ) -> dict:
     """SDXL 키프레임 1장. `reference=(mode, 업로드된 이미지 이름)`.
 
     mode: "ipadapter" — 참조 이미지를 CLIP vision 임베딩으로 주입(인물 고정)
           "img2img"   — 참조 이미지를 잠재로 인코딩하고 denoise를 낮춰 변형(폴백)
+
+    D67/D68: `layout`(업로드된 블록아웃 PNG)이 있으면 **정체성은 IPAdapter 참조,
+    구도는 레이아웃 img2img 잠재**로 동시에 주입한다. 레이아웃이 latent를 덮어쓴다.
     """
     flow: dict = {
         "1": {
@@ -169,6 +173,26 @@ def build_workflow(
         latent = ["11", 0]
         denoise = cfg.img2img_denoise
 
+    if layout:
+        # D67: 3D 블록아웃을 구도 잠재로 주입한다. 위 IPAdapter 모델은 그대로 유지된다.
+        flow["20"] = {"class_type": "LoadImage", "inputs": {"image": layout}}
+        flow["21"] = {
+            "class_type": "ImageScale",
+            "inputs": {
+                "image": ["20", 0],
+                "upscale_method": "lanczos",
+                "width": cfg.width,
+                "height": cfg.height,
+                "crop": "center",
+            },
+        }
+        flow["22"] = {
+            "class_type": "VAEEncode",
+            "inputs": {"pixels": ["21", 0], "vae": ["1", 2]},
+        }
+        latent = ["22", 0]
+        denoise = cfg.img2img_denoise
+
     flow["4"] = {
         "class_type": "EmptyLatentImage",
         "inputs": {"width": cfg.width, "height": cfg.height, "batch_size": 1},
@@ -200,6 +224,7 @@ def stage_key(
     ref_target: int | None = None,
     ref_digest: str | None = None,
     ref_card: str | None = None,
+    layout_digest: str | None = None,
 ) -> str:
     """키프레임 캐시 키.
 
@@ -232,6 +257,7 @@ def stage_key(
                 if (reference or ref_target is not None or ref_card is not None)
                 else "none"
             ),
+            "layout": layout_digest or "none",  # D67 — 3D 구도 해시
         }
     )
 
@@ -244,9 +270,10 @@ def generate(
     *,
     reference: Path | None = None,
     reference_label: str = "",
+    layout: Path | None = None,
     force: bool = False,
 ) -> tuple[Path, dict]:
-    """SDXL 4시드 → 최고 1장. `reference`가 있으면 컷 사이 인물 참조(D64)."""
+    """SDXL 4시드 → 최고 1장. `reference`=정체성(D66), `layout`=3D 구도(D67)."""
     if cfg.kf_reference not in ("ipadapter", "img2img"):
         reference, reference_label = None, ""   # CINEMOKHWA_KF_REF=none
     dest = project.keyframe_path(scene["id"])
@@ -256,6 +283,7 @@ def generate(
             "file": dest.name,
             "reference": reference_label if reference is not None else "",
             "reference_mode": cfg.kf_reference if reference is not None else "none",
+            "layout": layout.name if layout is not None else "",
         }
 
     prompt = prompt_for(project, scene)
@@ -270,6 +298,7 @@ def generate(
             modes.append("img2img")   # 폴백(D64)
 
     uploaded = comfy.upload_image(reference) if reference is not None else ""
+    uploaded_layout = comfy.upload_image(layout) if layout is not None and layout.exists() else ""
 
     failed: set[str] = set()
     for seed in SEEDS:
@@ -278,10 +307,15 @@ def generate(
         attempts = [m for m in (modes or ["none"]) if m not in failed]
         for attempt, mode in enumerate(attempts):
             ref = (mode, uploaded) if mode != "none" else None
-            workflow = build_workflow(cfg, prompt, KEYFRAME_NEGATIVE, seed, prefix, reference=ref)
+            workflow = build_workflow(
+                cfg, prompt, KEYFRAME_NEGATIVE, seed, prefix,
+                reference=ref, layout=uploaded_layout or None,
+            )
             label = f"키프레임 {scene['id']:02d} s{seed}"
             if mode != "none":
                 label += f" · 참조 {mode} ({reference_label})"
+            if uploaded_layout:
+                label += f" · 3D구도 ({layout.name})"
             if attempt:
                 label += " · 폴백"
             try:
@@ -314,6 +348,7 @@ def generate(
         "file": dest.name,
         "reference": reference_label,
         "reference_mode": used_mode,
+        "layout": layout.name if layout is not None else "",
         "elapsed": round(time.time() - t0, 1),
     }
     return dest, meta

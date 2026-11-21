@@ -27,7 +27,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from engine import assemble, character, i2v, keyframe, script, verify  # noqa: E402
+from engine import assemble, character, i2v, keyframe, layout3d, script, verify  # noqa: E402
 from engine import project as project_mod  # noqa: E402
 from engine.comfy import Comfy  # noqa: E402
 from engine.config import Config  # noqa: E402
@@ -96,7 +96,7 @@ def run_pipeline(
     force: bool = False,
     only_scene: int | None = None,
 ) -> Path:
-    total = 5
+    total = 6
     t_all = time.time()
     comfy = Comfy(cfg)
 
@@ -148,8 +148,35 @@ def run_pipeline(
             say("      인물 없음 — 카드 생성 생략")
     comfy.free_memory()
 
-    # 3. 키프레임 ---------------------------------------------------------
-    step(3, total, "키프레임 (SDXL 4시드 → 중앙 선명도 최고)")
+    # 3. 3D 레이아웃 (D67) -------------------------------------------------
+    step(3, total, "3D 레이아웃 (결정론적 구도 · 블록아웃)")
+    lkey = project_mod.digest(
+        {"stage": "layout", "keys": [
+            layout3d.stage_key(project, s, i)
+            for i, s in enumerate(project.scenes())
+        ]}
+    )
+    layouts_ready = all(
+        layout3d.layout_path(project, s["id"]).exists() for s in project.scenes()
+    )
+    if project.done("layout", lkey) and layouts_ready and not force:
+        skip(f"{len(project.scenes())}장 · 구도 캐시")
+    else:
+        project.begin("layout", lkey)
+        t = time.time()
+        linfo = []
+        for i, s in enumerate(project.scenes()):
+            p, meta = layout3d.generate(
+                project, s, sequence=i,
+                width=cfg.width, height=cfg.height, force=force,
+            )
+            linfo.append({"scene": s["id"], **meta})
+        project.finish("layout", lkey, seconds=round(time.time() - t, 1), items=linfo)
+        project.log_line(f"layout ok {time.time() - t:.1f}s")
+        say(f"      완료 — {len(linfo)}장 ({human(time.time() - t)}) · CPU만 사용")
+
+    # 4. 키프레임 ---------------------------------------------------------
+    step(4, total, "키프레임 (SDXL 4시드 → 중앙 선명도 최고 · 3D 구도 주입)")
     chain_of = chain_sources(project)
     stage_ids = {int(s["id"]) for s in scenes}
     # 참조 대상은 대본만 보고 정한다(파일 존재 여부에 캐시 키가 흔들리지 않게).
@@ -193,6 +220,7 @@ def run_pipeline(
                 if refs[int(s["id"])] and refs[int(s["id"])]["kind"] == "card"
                 else None
             ),
+            layout_digest=project_mod.file_digest(layout3d.layout_path(project, s["id"])),
         )
         for s in scenes
     ]
@@ -219,6 +247,7 @@ def run_pipeline(
                 path, info = keyframe.generate(
                     cfg, comfy, project, s,
                     reference=ref, reference_label=ref_label,
+                    layout=layout3d.layout_path(project, s["id"]),
                     force=force or key_changed,
                 )
                 meta.append({"scene": s["id"], **info})
@@ -237,8 +266,8 @@ def run_pipeline(
         say(f"      완료 — {human(time.time() - t)}")
     comfy.free_memory()
 
-    # 4. 클립 -------------------------------------------------------------
-    step(4, total, f"영상 클립 (Wan I2V · {cfg.i2v_steps}스텝 · {cfg.width}×{cfg.height})")
+    # 5. 클립 -------------------------------------------------------------
+    step(5, total, f"영상 클립 (Wan I2V · {cfg.i2v_steps}스텝 · {cfg.width}×{cfg.height})")
     chain_of = chain_sources(project)
     clip_keys = []
     chain_dirs: dict[int, Path | None] = {}
@@ -296,8 +325,8 @@ def run_pipeline(
         say(f"      완료 — {human(time.time() - t)}")
     comfy.free_memory()
 
-    # 5. 조립 -------------------------------------------------------------
-    step(5, total, f"조립 (크로스페이드 {cfg.crossfade_seconds}초 · CRF{cfg.crf})")
+    # 6. 조립 -------------------------------------------------------------
+    step(6, total, f"조립 (크로스페이드 {cfg.crossfade_seconds}초 · CRF{cfg.crf})")
     all_clips = [project.clip_path(s["id"]) for s in project.scenes()]
     missing = [c.name for c in all_clips if not c.exists()]
     if missing:
@@ -475,7 +504,7 @@ def cmd_make(args: argparse.Namespace) -> int:
 
     scenes = cfg.scene_count(project.target_seconds)
     n_chars = len(project.bible().get("characters") or []) or 1
-    est = estimate_minutes(cfg, scenes, n_chars)
+    est = estimate_minutes(cfg, scenes, n_chars) + 0.1  # D67 레이아웃(CPU)
     say(
         f"계획: {scenes}씬 × {cfg.clip_seconds:.0f}초 · {cfg.width}×{cfg.height} · "
         f"{cfg.i2v_steps}스텝 · 예상 {est:.0f}분"

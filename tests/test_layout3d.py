@@ -87,4 +87,22 @@ assert data["scene_id"] == 1 and len(data["figures"]) == 1
 assert "bpy.ops.render.render" in text
 print("PASS: Blender export(동일 좌표계)")
 
+# 8) 이중 참조 — 정체성(IPAdapter) + 구도(레이아웃 img2img)가 동시에 연결
+from engine import keyframe  # noqa: E402
+from engine.config import Config  # noqa: E402
+
+flow = keyframe.build_workflow(
+    Config(), "visual", "negative", 101, "test",
+    reference=("ipadapter", "card.png"), layout="layout.png",
+)
+assert flow["10"]["class_type"] == "IPAdapterAdvanced"
+assert flow["20"]["inputs"]["image"] == "layout.png"
+assert flow["22"]["class_type"] == "VAEEncode"
+assert flow["5"]["inputs"]["model"] == ["10", 0]     # 정체성 = 카드
+assert flow["5"]["inputs"]["latent_image"] == ["22", 0]  # 구도 = 레이아웃
+k1 = keyframe.stage_key(Config(), proj, SCENES[0], ref_card="char:jun", layout_digest="aaa")
+k2 = keyframe.stage_key(Config(), proj, SCENES[0], ref_card="char:jun", layout_digest="bbb")
+assert k1 != k2
+print("PASS: IPAdapter(정체성) + 레이아웃 img2img(구도) 동시 주입 + 캐시키 반영")
+
 print("\nALL PASS")
