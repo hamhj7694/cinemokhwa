@@ -27,7 +27,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from engine import assemble, i2v, keyframe, script, verify  # noqa: E402
+from engine import assemble, character, i2v, keyframe, script, verify  # noqa: E402
 from engine import project as project_mod  # noqa: E402
 from engine.comfy import Comfy  # noqa: E402
 from engine.config import Config  # noqa: E402
@@ -68,11 +68,12 @@ def human(seconds: float) -> str:
     return f"{m}분 {s:02d}초" if m else f"{s}초"
 
 
-def estimate_minutes(cfg: Config, scenes: int) -> float:
-    """P0 실측 기반. 키프레임 4장×24초 + I2V (0.72×steps+3.6)분/클립."""
+def estimate_minutes(cfg: Config, scenes: int, characters: int = 1) -> float:
+    """P0 실측 기반. 카드 4장 + 키프레임 4장×24초 + I2V (0.72×steps+3.6)분/클립."""
+    cards = characters * len(keyframe.SEEDS) * 0.4
     keyframes = scenes * len(keyframe.SEEDS) * 0.4
     clips = scenes * (0.72 * cfg.i2v_steps + 3.6)
-    return keyframes + clips + 1.0
+    return cards + keyframes + clips + 1.0
 
 
 def chain_sources(project: project_mod.Project) -> dict[int, int | None]:
@@ -95,7 +96,7 @@ def run_pipeline(
     force: bool = False,
     only_scene: int | None = None,
 ) -> Path:
-    total = 4
+    total = 5
     t_all = time.time()
     comfy = Comfy(cfg)
 
@@ -123,8 +124,32 @@ def run_pipeline(
             raise CineError("PROJECT-003", f"장면 {only_scene}이(가) 대본에 없습니다.")
         force = True
 
-    # 2. 키프레임 ---------------------------------------------------------
-    step(2, total, "키프레임 (SDXL 4시드 → 중앙 선명도 최고)")
+    # 2. 캐릭터 카드 (D66 ①) -----------------------------------------------
+    step(2, total, "캐릭터 기준 이미지 (정면 카드 · D66 ①)")
+    ckey = character.stage_key(cfg, project)
+    chars = project.bible().get("characters") or []
+    cards_ready = all(character.card_path(project, c["id"]).exists() for c in chars)
+    if project.done("characters", ckey) and cards_ready and not force:
+        skip(f"{len(chars)}장 · bible.ref 유지")
+        character.generate_all(cfg, comfy, project)  # 캐시여도 ref 재기입
+    else:
+        project.begin("characters", ckey)
+        t = time.time()
+        try:
+            cinfo = character.generate_all(cfg, comfy, project, force=force)
+        except CineError as exc:
+            project.fail("characters", str(exc))
+            raise
+        project.finish("characters", ckey, seconds=round(time.time() - t, 1), items=cinfo)
+        project.log_line(f"characters ok {time.time() - t:.1f}s")
+        if cinfo:
+            say(f"      완료 — {len(cinfo)}명 ({human(time.time() - t)})")
+        else:
+            say("      인물 없음 — 카드 생성 생략")
+    comfy.free_memory()
+
+    # 3. 키프레임 ---------------------------------------------------------
+    step(3, total, "키프레임 (SDXL 4시드 → 중앙 선명도 최고)")
     chain_of = chain_sources(project)
     stage_ids = {int(s["id"]) for s in scenes}
     # 참조 대상은 대본만 보고 정한다(파일 존재 여부에 캐시 키가 흔들리지 않게).
@@ -135,7 +160,16 @@ def run_pipeline(
         if chain_of.get(sid) is not None or cfg.kf_reference == "none":
             refs[sid] = None
             continue
-        target = keyframe.reference_target(project, s)
+        card = character.card_for(project, s)  # D66 ①: 정면 카드를 1순위로
+        if card is not None:
+            path, label = card
+            refs[sid] = {
+                "kind": "card",
+                "label": label,
+                "digest": project_mod.file_digest(path),
+            }
+            continue
+        target = keyframe.reference_target(project, s)  # 카드 없으면 종전 규칙
         if target is None:
             refs[sid] = None
             continue
@@ -144,12 +178,21 @@ def run_pipeline(
         if tid not in stage_ids:   # 이번 실행에서 다시 만들지 않는 대상만 파일 해시 반영
             path = keyframe.reference_path(project, tid)
             digest = project_mod.file_digest(path) if path else "none"
-        refs[sid] = {"target": tid, "label": label, "digest": digest}
+        refs[sid] = {"kind": "keyframe", "target": tid, "label": label, "digest": digest}
     kf_keys = [
         keyframe.stage_key(
             cfg, project, s,
-            ref_target=refs[int(s["id"])]["target"] if refs[int(s["id"])] else None,
+            ref_target=(
+                refs[int(s["id"])]["target"]
+                if refs[int(s["id"])] and refs[int(s["id"])]["kind"] == "keyframe"
+                else None
+            ),
             ref_digest=refs[int(s["id"])]["digest"] if refs[int(s["id"])] else None,
+            ref_card=(
+                refs[int(s["id"])]["label"]
+                if refs[int(s["id"])] and refs[int(s["id"])]["kind"] == "card"
+                else None
+            ),
         )
         for s in scenes
     ]
@@ -167,8 +210,12 @@ def run_pipeline(
                 info_ref = refs[int(s["id"])]
                 ref, ref_label = (None, "")
                 if info_ref:
-                    ref = keyframe.reference_path(project, info_ref["target"])
-                    ref_label = info_ref["label"]
+                    if info_ref["kind"] == "card":
+                        ref = character.card_by_label(project, info_ref["label"])
+                        ref_label = info_ref["label"]
+                    else:
+                        ref = keyframe.reference_path(project, info_ref["target"])
+                        ref_label = info_ref["label"]
                 path, info = keyframe.generate(
                     cfg, comfy, project, s,
                     reference=ref, reference_label=ref_label,
@@ -190,8 +237,8 @@ def run_pipeline(
         say(f"      완료 — {human(time.time() - t)}")
     comfy.free_memory()
 
-    # 3. 클립 -------------------------------------------------------------
-    step(3, total, f"영상 클립 (Wan I2V · {cfg.i2v_steps}스텝 · {cfg.width}×{cfg.height})")
+    # 4. 클립 -------------------------------------------------------------
+    step(4, total, f"영상 클립 (Wan I2V · {cfg.i2v_steps}스텝 · {cfg.width}×{cfg.height})")
     chain_of = chain_sources(project)
     clip_keys = []
     chain_dirs: dict[int, Path | None] = {}
@@ -249,8 +296,8 @@ def run_pipeline(
         say(f"      완료 — {human(time.time() - t)}")
     comfy.free_memory()
 
-    # 4. 조립 -------------------------------------------------------------
-    step(4, total, f"조립 (크로스페이드 {cfg.crossfade_seconds}초 · CRF{cfg.crf})")
+    # 5. 조립 -------------------------------------------------------------
+    step(5, total, f"조립 (크로스페이드 {cfg.crossfade_seconds}초 · CRF{cfg.crf})")
     all_clips = [project.clip_path(s["id"]) for s in project.scenes()]
     missing = [c.name for c in all_clips if not c.exists()]
     if missing:
@@ -427,7 +474,8 @@ def cmd_make(args: argparse.Namespace) -> int:
         say(f"실행 생성: {project.run_id} · {project.dir}")
 
     scenes = cfg.scene_count(project.target_seconds)
-    est = estimate_minutes(cfg, scenes)
+    n_chars = len(project.bible().get("characters") or []) or 1
+    est = estimate_minutes(cfg, scenes, n_chars)
     say(
         f"계획: {scenes}씬 × {cfg.clip_seconds:.0f}초 · {cfg.width}×{cfg.height} · "
         f"{cfg.i2v_steps}스텝 · 예상 {est:.0f}분"
@@ -469,16 +517,18 @@ def cmd_verify(args: argparse.Namespace) -> int:
     say(f"품질 측정 — {project.run_id} · 클립 {len(result['clips'])}개 · "
         f"{result['sample_every']}프레임마다 표본")
     say("")
-    say(f"{'scene':>5} {'frames':>6} {'YAVG':>7} {'YAVGsd':>7} {'YDIF':>7} "
-        f"{'ratio':>6} {'MAE':>6}  verdict")
-    say("-" * 60)
+    say(f"{'scene':>5} {'경계':>4} {'기준':>11} {'YAVGsd':>7} {'YDIF':>6} "
+        f"{'MAE':>6} {'SSIM':>6} {'팔레트':>6} {'드리프트':>8}  verdict")
+    say("-" * 88)
     for row in result["clips"]:
-        ratio = "-" if row["ratio"] is None else f"{row['ratio']:.2f}"
         mae = "-" if row["first_frame_mae"] is None else f"{row['first_frame_mae']:.2f}"
+        ssim = "-" if row["ssim"] is None else f"{row['ssim']:.2f}"
+        pal = "-" if row["palette_l1"] is None else f"{row['palette_l1']:.1f}"
+        boundary = "연장" if row["boundary"] == "extend" else "컷"
         mark = {"PASS": "✓", "WARN": "!", "FAIL": "✗"}[row["verdict"]]
-        say(f"{row['scene']:>5} {row['frames']:>6} {row['yavg_mean']:>7.1f} "
-            f"{row['yavg_std']:>7.2f} {row['ydif_median']:>7.2f} {ratio:>6} "
-            f"{mae:>6}  {mark} {row['verdict']}"
+        say(f"{row['scene']:>5} {boundary:>4} {row['reference']:>11} "
+            f"{row['yavg_std']:>7.2f} {row['ydif_median']:>6.2f} {mae:>6} "
+            f"{ssim:>6} {pal:>6} {row['end_drift']:>8.1f}  {mark} {row['verdict']}"
             + ("   (wide)" if row["wide_shot"] else ""))
 
     notes = [(r["scene"], k, v) for r in result["clips"]
