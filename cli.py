@@ -275,6 +275,13 @@ def run_pipeline(
         project.finish("keyframes", key, seconds=round(time.time() - t, 1), items=meta)
         project.log_line(f"keyframes ok {time.time() - t:.1f}s")
         say(f"      완료 — {human(time.time() - t)}")
+        # D71b: 클립 생성(약 50분) 전에 밝기 편향을 조기 경고한다.
+        kf_yavgs = [m["selected_yavg"] for m in meta if m.get("selected_yavg") is not None]
+        if len(kf_yavgs) >= 2:
+            kf_spread = round(max(kf_yavgs) - min(kf_yavgs), 2)
+            if kf_spread > verify.CROSS_YAVG_WARN:
+                say(f"      ⚠ 키프레임 밝기 차이 {kf_spread} — "
+                    f"씬 간 분위기가 다를 수 있음(D71). 연장 씬은 체이닝으로 보정될 수 있음.")
     comfy.free_memory()
 
     # 5. 클립 -------------------------------------------------------------
