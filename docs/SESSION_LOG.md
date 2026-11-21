@@ -31,7 +31,7 @@ main 푸시 범위: `482f99e..36677de`. feature 브랜치는 `origin/feature/3d-
 | 항목 | 상태 | 다음 |
 |---|---|---|
 | `identity-01` 재개 | scene 1 클립 캐시, scene 2부터 재생성 중 (ComfyUI 재기동 완료) | 완료 시 verify + ffprobe + WORKLOG 실측 |
-| 3D 가이드 실 스모키 | 코드·오프라인 테스트 완료, ComfyUI 실행은 VRAM 직렬화로 본 렌더 종료 후 | 저해상도 3씬 → main 병합 |
+| 3D 가이드 실 스모키 | 코드·오프라인 테스트 완료. `guided-01`(832×480/6스텝/이중 참조 전체 영상)이 `identity-01` 종료 후 자동 실행 대기 중 | 저해상도 3씬 영상 확인 → main 병합 |
 | 최종 육안 판정 | 사용자 차례 | `identity-01/final.mp4` 경로 안내 예정 |
 
 ### 중요 판단 근거
@@ -83,5 +83,6 @@ main 푸시 범위: `482f99e..36677de`. feature 브랜치는 `origin/feature/3d-
 - [x] 기획 3안 기록 + 방향 결정
 - [x] 브랜치 생성 + 기능 단위 구현/커밋/푸시 (feature 2개)
 - [x] 오프라인 테스트 ALL PASS + CPU 스모키(3씬 0.18초)
-- [ ] ComfyUI 실 스모키 → feature main 병합
+- [ ] ComfyUI 실 스모키(`guided-01`) → feature main 병합
 - [ ] `identity-01` 완료 → verify → 최종 보고서 최신화
+- [ ] WORKLOG 커밋 `cfe5ef9` 반영(스모키 실측·본 렌더 중간 실측)
