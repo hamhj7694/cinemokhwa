@@ -1,5 +1,7 @@
 # PRD — 씨네목화 (cinemokhwa)
 
+> **현행 P2 기준 안내 (2026-11-26):** 이 파일은 초기 제품 비전과 FR-01~25를 보존하는 **레거시 전제품 요구사항**이다. 새로운 3D/실사 하이브리드의 현재 단계별 범위·게이트는 [P2_REQUIREMENTS.md](P2_REQUIREMENTS.md), 문서 우선순위는 [DOCS_INDEX.md](DOCS_INDEX.md)를 참조. 아래 승인 대기/최신 여부 표시는 작성 당시 기록이다.
+
 > **제품 요구사항 정의서 (Product Requirements Document)**
 > 버전: v0.2 (Q1~Q7 답변 반영) · 작성: 2026-11-14
 > 상위 문서: [`DESIGN.md`](DESIGN.md) — 결정 로그 D1~D54의 단일 기준서
