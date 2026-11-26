@@ -1,5 +1,7 @@
 # 최종 보고서 (씨네목화)
 
+> **기록 시점 안내 (2026-11-26):** 아래 최종 보고서는 2026-11-21 `guided-50` P1 검증에 관한 기록이다. 신규 P2 하이브리드의 진척·완료 보고가 아니다. [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md) 및 [P2_ROADMAP.md](P2_ROADMAP.md) 참조.
+
 > 항상 최신 상태로 갱신한다. 최종 갱신: 2026-11-21 (guided-50 검증 완료, 육안 게이트 대기)
 > 상세 작업 기록: [`SESSION_LOG.md`](SESSION_LOG.md)
 
