@@ -13,7 +13,7 @@
 
 ## 저장 구조 제안
 ```text
-C:/Users/mbc/mokhwa/work/p2-<run_id>/
+C:/Users/mbc/mokhwa/work/<run_id>/   # run_id must start with p2-
   input/                  # 허용받은 입력 사본/참조 목록(원본을 Git에 커밋 금지)
   script.json             # 기존 Gemma schema:2 원본(읽기 전용)
   scene_spec.json         # P2 정규화 후 장면 정의
@@ -29,7 +29,7 @@ C:/Users/mbc/mokhwa/work/p2-<run_id>/
   manifest.json
   final.mp4                 # 다샷 단계에서
 ```
-P1 `work/<run_id>` 형식은 계속 보존. P2 경로 충돌 방지를 위해 별도 접두어 사용.
+P1 `work/<run_id>` 형식은 계속 보존. P2 `run_id` 자체가 `p2-` 접두어를 가져 경로 중복·P1 충돌을 방지한다.
 
 ## 주요 계약(JSON 예시, 실제 값은 단위테스트로 보정)
 
