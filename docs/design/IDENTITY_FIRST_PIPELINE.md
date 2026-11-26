@@ -1,5 +1,7 @@
 # 신규 파이프라인 연구 — 정체성·구도 우선 하이브리드 (P2)
 
+> **2026-11-26 상태:** 이 문서는 P2 방향의 기술 조사·가설·과거 계획 기록이다. **현재 통합 기준 문서는 [../P2_REQUIREMENTS.md](../P2_REQUIREMENTS.md)·[../P2_ARCHITECTURE.md](../P2_ARCHITECTURE.md)·[../P2_CONTRACTS.md](../P2_CONTRACTS.md)**. Layout-to-Render/LoRA/MSR/Blender 풀 프리비즈는 전체 통합 완료로 간주하지 않는다.
+
 > 작성: 2026-11-21 · 개정: 2026-11-21 (3차) · 상태: **연구 완료 / 설치 진행 중**
 > 2차 개정: **GGUF 경로 확정** (12GB 실행 가능) + 공식 **Layout-to-Render IC-LoRA** 발견 + **MSR V2 다중 참조** 채택
 > 3차 개정: **3D는 틀만, 외형은 실사 이미지** (사용자 지적 반영) + **Krea 2 / Qwen-Image 2.1 드롭다운** 추가

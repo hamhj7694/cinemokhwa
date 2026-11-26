@@ -1,5 +1,7 @@
 # 씨네목화 (cinemokhwa)
 
+> **2026-11-26 최신 기획 안내:** 개발·에이전트 시작점은 [AGENTS.md](AGENTS.md) → [문서 지도](docs/DOCS_INDEX.md) → [P2 요구사항](docs/P2_REQUIREMENTS.md) → [통합 아키텍처](docs/P2_ARCHITECTURE.md) → [작업 로드맵](docs/P2_ROADMAP.md). 아래 README의 영상 파이프라인·성능 예시는 **현재 P1 기반 구현/시험 기록**이고, 새 P2 하이브리드는 독립 모듈 단계로 **미통합**이다.
+
 > **목소리로 짓는 영화**
 > 외부 유료 영상 생성 API를 사용하지 않는 로컬 AI 영상 제작 파이프라인 — 개발·실험 중
 

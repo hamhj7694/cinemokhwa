@@ -1,5 +1,7 @@
 # DESIGN PLAN — 씨네목화 UI/UX (Figma 우선)
 
+> **최신 P2 범위 안내 (2026-11-26):** 아래 UI/UX 설계는 기존 장기 제품 목표의 디자인 가이드다. P2 핵심 영상 품질 실험(H1~H5)이 완료되기 전 UI 구현을 완료 단계로 주장하지 않는다. [../P2_REQUIREMENTS.md](../P2_REQUIREMENTS.md)·[../P2_ROADMAP.md](../P2_ROADMAP.md) 참고.
+
 > 버전 v0.1 · 작성 2026-11-14
 > 상위: [`../../docs/PRD.md`](../PRD.md) · [`../DESIGN.md`](../DESIGN.md) D21·D27·D28·D31·D35·D43
 > 이 문서는 **Figma에서 그릴 것**을 정의한다. 코드 구현은 이 문서를 따르되, 승인 후(D39)에만.

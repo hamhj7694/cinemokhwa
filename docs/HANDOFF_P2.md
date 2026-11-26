@@ -1,5 +1,7 @@
 # P2 하이브리드 파이프라인 — 작업 인계서 (다른 PC 이어받기용)
 
+> **역할 구분 (2026-11-26):** 이 파일은 2026-11-21 P2 **설치·독립 시험·실측 기록**이다. 현재 P2 전체 기획/통합 기준은 [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md)·[P2_REQUIREMENTS.md](P2_REQUIREMENTS.md)·[P2_CONTRACTS.md](P2_CONTRACTS.md)·[P2_ROADMAP.md](P2_ROADMAP.md)이다. 아직 `p2 make` 및 Blender 시간축 프리비즈 통합이 완료된 것은 아니다.
+
 > 작성 시점: 2026-11-21 / 마지막 커밋: `302f7f1` + 이번 커밋(미생성)
 > 이 문서만 읽으면 지금까지의 결정·설치·측정·남은 일을 이어받을 수 있습니다.
 

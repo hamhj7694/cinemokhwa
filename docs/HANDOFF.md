@@ -1,5 +1,7 @@
 # HANDOFF — 씨네목화 인수인계
 
+> **인계서 최신성 주의 (2026-11-26):** 이 파일은 2026-11-17 P1 인계 시점의 기록이다. 최신 에이전트 시작점은 [AGENTS.md](../AGENTS.md), [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md), 신규 하이브리드 개발 정보는 [HANDOFF_P2.md](HANDOFF_P2.md) 및 [P2_ROADMAP.md](P2_ROADMAP.md) 참고.
+
 > 최종 갱신: 2026-11-17 · P1-15(장면 간 일관성) 작업 단위 종료 시점
 > 읽는 사람: 이 프로젝트를 처음 보는 사람(개발자·비개발자 모두)
 > 더 깊은 내용: `docs/DESIGN.md`(결정 로그) · `docs/TASKS.md`(티켓) · `docs/WORKLOG.md`(run별 실측) · `engine/README.md`(구현 규격)
