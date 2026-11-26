@@ -1,5 +1,7 @@
 # 인수인계 프롬프트 — 큐원(Q-One)
 
+> **레거시 프롬프트 (2026-11-26):** 이 프롬프트의 '최신 인계서', 브랜치, 현황은 과거 상태다. **새 에이전트에게 이 문서만 붙여넣지 말 것.** 반드시 [../../AGENTS.md](../../AGENTS.md) → [../DOCS_INDEX.md](../DOCS_INDEX.md) → [../PROJECT_CONTEXT.md](../PROJECT_CONTEXT.md) → [../P2_ROADMAP.md](../P2_ROADMAP.md)를 먼저 읽는다. 아래 내용은 11월 17~21일 기록으로 보존.
+
 > 버전 v2 · 2026-11-17
 > 용도: 새 세션에 그대로 붙여넣어 씨네목화 개발을 이어받게 한다.
 > 전제: 저장소 `C:\Users\mbc\Documents\git\cinemokhwa`, 실행/데이터 `C:\Users\mbc\mokhwa`.
