@@ -79,7 +79,13 @@ P1 `work/<run_id>` 형식은 계속 보존. P2 `run_id` 자체가 `p2-` 접두�
     "prompt_visual": "man in a grey coat on a rainy street",
     "prompt_motion": "man walks forward, camera tracks slowly",
     "entity_ids": ["char-jun", "place-alley"],
-    "camera_intent": "medium tracking shot"
+    "camera_intent": "medium tracking shot",
+    "previs_policy": {
+      "profile": "coarse", "profile_source": "manual",
+      "guide_channel": "prompt_only", "clean_guide": true,
+      "control_priority": {"camera":"high","root_path":"high","contact":"not_specified","joint_pose":"not_specified"},
+      "reason": "root path + camera; no required limb contact", "override_reason": null
+    }
   }]
 }
 ```
@@ -111,13 +117,14 @@ P1 `work/<run_id>` 형식은 계속 보존. P2 `run_id` 자체가 `p2-` 접두�
     "camera": {"position_m": [0,1.6,0], "target_m": [0,1.3,6]},
     "objects": [{
       "entity_id": "char-jun", "instance_id": 1,
+      "root_position_m": [0, 0, 4], "root_rotation_euler_rad": [0, 0, 0],
       "bbox_xyxy_norm": [0.35,0.2,0.62,0.95],
       "visible": true
     }]
   }]
 }
 ```
-`bbox_xyxy_norm`은 0..1 기준 xyxy, 음수/범위 초과 거부. 실제 프레임·객체 가시성·프레임 수 연속 여부 확인. Depth/Segmentation/Pose는 단계별 optional→필수 승격 전 버전 갱신.
+`bbox_xyxy_norm`은 0..1 기준 xyxy, 음수/범위 초과 거부. root pose/카메라/접촉이 요구되는 샷에는 별도 `control_tracks`/`contact_events` 정본을 두며, 미지정 손가락/표정의 자세는 가짜 값으로 채우지 않는다. 실제 프레임·객체 가시성·프레임 수 연속 여부 확인. Depth/Segmentation/Pose는 단계별 optional→필수 승격 전 버전 갱신.
 
 ### `manifest.json` — orchestrator/캐시
 ```json
@@ -131,7 +138,7 @@ P1 `work/<run_id>` 형식은 계속 보존. P2 `run_id` 자체가 `p2-` 접두�
   }
 }
 ```
-유효한 `status`: pending/running/done/failed/needs_review. `done`은 파일 존재+해시+검증을 만족할 때만. 각 stage의 elapsed_seconds, 모델/seed/설정/오류 코드를 남김(필수 메타 정의는 H-002 계약 동결).
+유효한 **pipeline stage** `status`: pending/running/done/failed/needs_review/blocked. `blocked`는 모델·권한·계약 미충족으로 실행할 수 없음을 의미한다. A/B experiment의 `not_run/done_technical/accepted_visual`과는 다른 상태 체계이며 혼용 금지. `done`은 파일 존재+해시+검증을 만족할 때만. 각 stage의 elapsed_seconds, 모델/seed/설정/오류 코드를 남김(필수 메타 정의는 H-002 계약 동결).
 
 ### `evaluation.json` — verify → 승인자
 ```json
