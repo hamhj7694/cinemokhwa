@@ -6,6 +6,8 @@
 > 용도: 새 세션에 그대로 붙여넣어 씨네목화 개발을 이어받게 한다.
 > 전제: 저장소 `C:\Users\mbc\Documents\git\cinemokhwa`, 실행/데이터 `C:\Users\mbc\mokhwa`.
 
+> **2026-11-28 P2 프리비즈 갱신:** 아래 복사용 이전 인계 프롬프트는 2026-11-17~21 상태를 담은 레거시다. 현행 재개 시 [AGENTS.md](../../AGENTS.md) → [문서 지도](../DOCS_INDEX.md) → [Adaptive Previs](../design/ADAPTIVE_PREVIS.md) → [P2_ROADMAP](../P2_ROADMAP.md)부터 읽어야 한다. **'프리비즈=풀 정교 3D'로 고정하지 말 것.**
+
 ## 사용법
 
 1. 새 세션을 연다.
