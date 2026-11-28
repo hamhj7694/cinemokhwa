@@ -11,6 +11,12 @@
 
 ---
 
+## 2026-11-28 설계 보완 참고 — Adaptive Previs
+
+기존 문서의 'Blender 풀 3D 프리비즈' 목표는 유지하지만, 실제 모델로 보여줄 3D 복잡도는 **샷별 최소 유효 정밀도**로 조절한다. 액션 샷에는 단순 root/camera proxy가 유리할 수 있지만 **신체 접촉/손동작**에 필요한 포즈·관절은 별도 데이터로 관리한다. 표정·실사 얼굴은 사진 참조와 영상 프롬프트 담당.
+LTX는 `LTXVAddGuide` 희소 프레임 방식과 Layout-to-Render 전체 비디오 IC-LoRA가 다르며, 전자는 전체 3D 움직임 고정을 보장하지 않는다.
+**현행 규범:** [ADAPTIVE_PREVIS](ADAPTIVE_PREVIS.md) · [실험 계획](../experiments/P2_PREVIS_VALIDATION.md) · [결정 기록](../adr/ADR-001-adaptive-previs.md). 아래 2026-11-21 연구 기록은 개발 완료로 해석 금지.
+
 ## 1. 결론 먼저 — 제안 5축 통합
 
 기존 방식은 **"씬마다 얼굴을 새로 생성하고, 약한 참조로 보정한다"**는 구조였다.
