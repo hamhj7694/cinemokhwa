@@ -27,7 +27,7 @@
 - **A5 QA:** dynamic/contact/face/camera A/B 샷, 형태·채도 전이, camera/root/contact 충실도, 일관성/소요 시간, 수치와 사람 육안 판정 구분.
 - **A6 UI:** H6에서 **샷별 단순/관절/없음 프로필 수동 변경**과 채널 가용성 표시; 실험 미완료 기능 노출 금지.
 
-상세: [Adaptive Previs](design/ADAPTIVE_PREVIS.md) · [실험 계획](experiments/P2_PREVIS_VALIDATION.md). 신규 H-021/022/023은 [P2_ROADMAP](P2_ROADMAP.md).
+상세: [Adaptive Previs](design/ADAPTIVE_PREVIS.md) · [실험 계획](experiments/P2_PREVIS_VALIDATION.md) · 파트별 명세 [A2 Blender](specs/PREVIS_A2.md) / [A3 이미지](specs/APPEARANCE_A3.md) / [A4 LTX](specs/LTX_GUIDE_A4.md) / [A5 QA](specs/QUALITY_A5.md). 신규 H-021/022/023은 [P2_ROADMAP](P2_ROADMAP.md).
 
 ## 2. 에이전트 호출용 작업 티켓 템플릿
 ```text
