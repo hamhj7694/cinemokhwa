@@ -56,6 +56,28 @@ H4 [다객체/프레임 앵커] → H5 [다샷/연결/속도] → H6 [API·UI/�
 | H-019 | H6 A6+A1 음성/자막 | 신규 `engine/audio.py` 등 | H-017 | 기존 FR-05/06/12와 연결, 시간축 기준 테스트 | 대기 |
 | H-020 | H6 A0 화풍/장르 확대 | 이미지·영상 모델 어댑터 | H-017 | 실사 파일럿 통과 후 별도 PRD/라이선스·육안 기준 | 대기 |
 
+## 2026-11-28 Adaptive Previs 추가 티켓 / 핵심 경로 수정
+
+> 과거 H-001~H-020의 원래 범위는 삭제하지 않고 다음 개발 티켓을 더한다. **실제 개발 미착수**.
+
+| 티켓 | 단계·담당 | 목표 | 선행 | DoD | 상태 |
+|---|---|---|---|---|---|
+| **H-021** | H1 A0+A1+A2 | 샷의 `none/coarse/joint_lite/geometry_rerender` 및 프롬프트/가이드 채널 정책 계약 설계 | H-001 | `previs_policy` fixture 및 dynamic/contact/face 사례의 분기 근거·수동 override 테스트; H-002 스키마와 동기화 | 미착수 |
+| **H-022** | H2/H3 A2+A4+A5 | 간단 3D vs 최소 관절 vs 가이드 없는 baseline, **같은 seed/첫 프레임/장면 A/B** | H-002+H-004+H-009 스모크 | 한 샷에서 채널 유효성 확인 후 dynamic/contact/face 실험 기록, 3D 색·캡슐 전이·얼굴/경로/자연스러움/실측 비용 비교; Go/No-Go | 미착수 |
+| **H-023** | H4 A2+A5 (조건부) | 접촉 샷에서 효과가 입증된 경우에만 `joint_lite` 실제 경로 및 소품/신체 교차 검증 | H-022 채택 + H-014 | 선별 관절만 표현, contact events·tracks·가림 관계 검증, 단일 샷 회귀 | 보류 |
+
+### 기존 티켓 해석 보완
+
+- **H-002:** `previs_policy`/프로필·가이드 채널/앵커 인덱스·재개 키를 스키마 v1에 포함. 확정 전 테스트 fixture만 사용.
+- **H-004:** **coarse 정본부터** root/camera 시간축 3D 애니메이션 구현. full body rig부터 만들지 않는다.
+- **H-005:** depth/seg/pose 자체가 필요한지 사용 채널과 실험 필요성으로 결정. 디버그/clean guide 분리.
+- **H-007/008:** 얼굴·외형은 3D 디테일이 아니라 승인된 참조 이미지·검증의 책임.
+- **H-009:** 단순히 `LTXVAddGuide` 노드 실행 성공이 아니라 가이드 없음 대비 **조건 추종·프록시 전이 평가**. IC-LoRA Layout-to-Render/Motion Control은 현재 자산 설치·호환 미검증으로 **별도 연구 티켓**.
+- **H-011/H-012:** H-022의 early Go/No-Go 결과를 검토하고 적용한 프로필/채널만 통합. 실패 시 `prompt_only` 대안으로 돌아가고 범위를 재결정.
+- **H6 UI:** 사용자가 샷별 profile을 보고 변경할 수 있도록 하되 실제 검증·승인된 옵션만 노출.
+
+세부 설계 [Adaptive Previs](design/ADAPTIVE_PREVIS.md), 실행 계획 [P2_PREVIS_VALIDATION](experiments/P2_PREVIS_VALIDATION.md).
+
 ## 마일스톤별 exit gate
 
 ### H0: 기획·준비
