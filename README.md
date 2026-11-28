@@ -15,7 +15,7 @@
 - 샷마다 **`coarse`(기본 실험 가설), `joint_lite`(필요 접촉·관절), `none`(비교), `geometry_rerender`(연구)** 중 필요한 최소한의 3D 형태를 선택하는 **Adaptive Previs** 설계 추가.
 - Blender control tracks(카메라/root/접촉/ID)는 정밀하게 보존하되, 모델에 보여줄 도형은 단순화. 얼굴·의상·감정은 사진 참조·실사 키프레임·프롬프트가 담당.
 - 현재 P1은 Blender **정지 3D 구도 PNG**이고, P2 풀 프리비즈 + LTX 효과는 **아직 통합 구현·육안 검증 전**.
-- [새 설계](docs/design/ADAPTIVE_PREVIS.md) · [근거 결정](docs/adr/ADR-001-adaptive-previs.md) · [A/B 검증](docs/experiments/P2_PREVIS_VALIDATION.md) · [전체 MD 32개 점검](docs/PLANNING_REVIEW_2026-11-28.md).
+- [새 설계](docs/design/ADAPTIVE_PREVIS.md) · [근거 결정](docs/adr/ADR-001-adaptive-previs.md) · [A/B 검증](docs/experiments/P2_PREVIS_VALIDATION.md) · [A2~A5 팀별 명세](docs/specs/PREVIS_A2.md) · [전체 MD 32개 점검](docs/PLANNING_REVIEW_2026-11-28.md).
 
 ## 포트폴리오 한눈에
 
