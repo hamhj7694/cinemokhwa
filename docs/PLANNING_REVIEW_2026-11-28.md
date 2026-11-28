@@ -39,6 +39,7 @@
 - [ADR-001](adr/ADR-001-adaptive-previs.md): '최저 필요 정밀도' 결정 근거 및 보류 항목.
 - [ADAPTIVE_PREVIS](design/ADAPTIVE_PREVIS.md): `none / coarse / joint_lite / geometry_rerender`, 제어 채널·프롬프트·반례 및 실패 규칙.
 - [P2_PREVIS_VALIDATION](experiments/P2_PREVIS_VALIDATION.md): Seedance → LTX **외삽 금지**와 동작·접촉·표정·카메라 A/B 실험 설계.
+- [A2 Blender 상세](specs/PREVIS_A2.md), [A3 외형 상세](specs/APPEARANCE_A3.md), [A4 LTX 가이드 상세](specs/LTX_GUIDE_A4.md), [A5 평가 상세](specs/QUALITY_A5.md)로 파트별 구현 경계를 정의.
 - 현행 요구사항/아키텍처/계약/로드맵/테스트/협업/에이전트 문서를 위 정본에 연결.
 
 ## 의도적으로 수정하지 않은 내용
