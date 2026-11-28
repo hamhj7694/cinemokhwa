@@ -7,7 +7,7 @@
 1. `docs/DOCS_INDEX.md` — 정본/과거 문서 구분
 2. `docs/PROJECT_CONTEXT.md` — 제품 목표, 사실로 확인된 상태, 주요 제약
 3. `docs/P2_REQUIREMENTS.md` — 신규 하이브리드의 제품 범위/수용 기준
-4. `docs/P2_ARCHITECTURE.md` — L0~L4, 모듈 분리, 통합 경계
+4. `docs/P2_ARCHITECTURE.md` — A~G 전체 파이프라인, 모듈 분리, 통합 경계
 5. `docs/P2_CONTRACTS.md` — 데이터 및 모듈 입력/출력 계약
 6. `docs/P2_ROADMAP.md` — 단계/티켓/의존성/완료 조건
 7. `docs/P2_TEST_PLAN.md`, `docs/TEAM_PLAYBOOK.md` — 검증 및 팀 협업
