@@ -36,7 +36,7 @@ H4 [다객체/프레임 앵커] → H5 [다샷/연결/속도] → H6 [API·UI/�
 | 티켓 | 단계·주 책임 | 파일 소유권(주요 경로) | 선행 | 완료 정의(DoD) | 상태 |
 |---|---|---|---|---|---|
 | H-001 | H0 A0 기획 정비 | `docs/P2_*.md`, `AGENTS.md` | 없음 | 문서 상호 링크/구현-계획 구분/기준선 게시 | 문서 작업 |
-| H-002 | H1 A1 계약 v1 동결 | `engine/p2_contracts.py`, `tests/test_p2_contracts.py` | H-001 | 4개 주요 JSON 정형/거부 테스트, fake fixture | 미착수 |
+| H-002 | H1 A1 계약 v1 동결 | `engine/p2_contracts.py`, `tests/test_p2_contracts.py` | H-001 + H-021 정책 제안 | 4개 주요 JSON 정형/거부 테스트, `previs_policy` / guide channel 포함 fake fixture | 미착수 |
 | H-003 | H1 A1 오케스트레이션 뼈대 | `engine/p2_pipeline.py`, `tests/test_p2_resume.py` | H-002 | GPU 없이 stage DAG/cache/partial resume 동작 | 미착수 |
 | H-004 | H2-A A2 Blender **coarse 프리비즈** | `engine/previs.py`, `tests/test_p2_previs.py` | H-002 + H-021 | 복잡한 rig 없이 root/camera 시간축 3~5초 + clean RGB/tracks, debug 분리, ID·프레임 정합성 | 미착수 |
 | H-005 | H2-A A2 geometry 패스 | `engine/previs.py`(동일 영역, H-004 후), `tests/test_p2_previs.py` | H-004 | depth/seg + 2D bbox/카메라 스펙과 프레임 정합성. pose 미지원이면 null 명시 | 미착수 |
