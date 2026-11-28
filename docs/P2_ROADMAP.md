@@ -38,14 +38,14 @@ H4 [다객체/프레임 앵커] → H5 [다샷/연결/속도] → H6 [API·UI/�
 | H-001 | H0 A0 기획 정비 | `docs/P2_*.md`, `AGENTS.md` | 없음 | 문서 상호 링크/구현-계획 구분/기준선 게시 | 문서 작업 |
 | H-002 | H1 A1 계약 v1 동결 | `engine/p2_contracts.py`, `tests/test_p2_contracts.py` | H-001 | 4개 주요 JSON 정형/거부 테스트, fake fixture | 미착수 |
 | H-003 | H1 A1 오케스트레이션 뼈대 | `engine/p2_pipeline.py`, `tests/test_p2_resume.py` | H-002 | GPU 없이 stage DAG/cache/partial resume 동작 | 미착수 |
-| H-004 | H2-A A2 Blender 3D 시간축 | `engine/previs.py`, `tests/test_p2_previs.py` | H-002 | 카메라+사람 대체 도형 3~5초 애니메이션 RGB 프레임, track ID/프레임 일치 | 미착수 |
+| H-004 | H2-A A2 Blender **coarse 프리비즈** | `engine/previs.py`, `tests/test_p2_previs.py` | H-002 + H-021 | 복잡한 rig 없이 root/camera 시간축 3~5초 + clean RGB/tracks, debug 분리, ID·프레임 정합성 | 미착수 |
 | H-005 | H2-A A2 geometry 패스 | `engine/previs.py`(동일 영역, H-004 후), `tests/test_p2_previs.py` | H-004 | depth/seg + 2D bbox/카메라 스펙과 프레임 정합성. pose 미지원이면 null 명시 | 미착수 |
 | H-006 | H2-B A3 자산 레지스트리 | `engine/asset_bank.py`, `tests/test_p2_assets.py` | H-002 | 외형 참조별 entity_id, 경로·해시·출처/승인, 부족 시 후속 차단 | 미착수 |
 | H-007 | H2-B A3 이미지 앵커 어댑터 | `engine/photo.py` 및 별도 P2 어댑터 | H-006 + H-004 fixture | 동일 참조/구도 입력, 후보선택 메타/육안 보류, Krea2 1회 실측 | 미착수 |
 | H-008 | H2-B A3 얼굴 게이트 | `engine/facegate.py`, `tests/test_p2_facegate.py` | H-006 | 얼굴 없거나 점수 낮음=needs_review, 역치 초과도 육안 미승인 | 미착수 |
-| H-009 | H3 A4 LTX 프레임 가이드 A/B | `engine/animate.py`, `tests/test_p2_animate.py` | H-002 + H-004 fixture | 동일 seed/첫 프레임에서 guide 유/무 비교, 메타·실제 프레임 인덱스 저장 | 미착수 |
+| H-009 | H3 A4 LTX **sparse RGB anchor** A/B | `engine/animate.py`, `tests/test_p2_animate.py` | H-002 + H-004 fixture | 동일 seed/첫 실사 프레임 guide 무/유 비교; source/applied 인덱스·proxy leakage 기록. IC-LoRA는 별도 연구 | 미착수 |
 | H-010 | H3 A5 공간·시간·화질 평가 | `engine/p2_verify.py`, `tests/test_p2_verify.py` | H-005 + H-008 | 얼굴·bbox 중심 이동·깜빡임·길이 측정, false PASS 방지 | 미착수 |
-| H-011 | H3 A1 실제 CLI 연결 | `cli.py` (단독 소유), `engine/p2_pipeline.py` | H-003,005,007,008,009,010 | `p2 make`(명령명 확정), 5초 단일 shot 파일/manifest/evaluation 결과 | 미착수 |
+| H-011 | H3 A1 실제 CLI 연결 | `cli.py` (단독 소유), `engine/p2_pipeline.py` | H-003,005,007,008,009,010 + **H-022 결과 검토** | 5초 단일 샷, 승인된 profile/channel만 실행, manifest/evaluation 및 실패 처리 | 미착수 |
 | H-012 | H3 A0+A5 사람 육안 pilot | `docs/WORKLOG.md`, 평가 결과(로컬) | H-011 | reference/guide/output 대조, PASS/FAIL 근거·영상 프레임/조건 기록 | 미착수 |
 | H-013 | H3 A4 성능/VRAM 최적화 | `engine/animate.py`, `docs/WORKLOG.md` | H-012 | 12GB/OOM/5초 성능 실측, Q2·해상도·분할 각각 비교 | 미착수 |
 | H-014 | H4 A2+A3 다객체 트랙·참조 | `engine/previs.py`, `asset_bank.py`, 분리 계약 테스트 | H-012 | 2인물 또는 사람+소품 ID 유지, 가림/재등장 검사 | 미착수 |
@@ -105,6 +105,6 @@ H4 [다객체/프레임 앵커] → H5 [다샷/연결/속도] → H6 [API·UI/�
 API/UI/오디오/화풍은 게이트 통과 후 별도 트랙으로 해제. `docs/PRD.md`의 장기 요구를 순서대로 연결.
 
 ## 다음 실행순서 (가장 적은 낭비)
-H-002 계약·fixture → H-003 cache/mock runner; 병렬로 H-004(3D 애니메이션)·H-006(참조 레지스트리); 각자 별도 fixture 통과 후 H-005/007/008; H-009·010; H-011 통합; H-012 사용자 육안; 그 뒤에만 H-013~019.
+H-021 샷별 정책 설계 → H-002 계약·fixture 확정 → H-003 cache/mock runner; 병렬 H-004(coarse Blender)·H-006(실사 참조); H-009 sparse frame guide의 **짧은 기술 스모크**와 H-005/007/008/010; **H-022 모드별 실험/Go-No-Go** → H-011 통합 → H-012 사용자 육안; H-023 접촉 관절 실제 구현은 H-022에서 효과가 입증된 경우에만 진행.
 
 **지금 바로 할 일:** H-002를 첫 독립 구현 티켓으로 확정하고 스키마/fixture/실패 테스트부터 만든다. 기술의 성공 여부가 불확실한 작업을 UI·멀티샷과 병렬로 진행하지 않는다.
