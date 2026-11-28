@@ -35,6 +35,17 @@
 - "인물·소품 사진을 3D 물체 표면에 직접 UV 매핑"은 이 아키텍처의 필수 구현 방식이 아니다. 3D 가이드+참조 이미지 기반 생성형 렌더링이 기본이다. 필요하면 별도 렌더러 실험으로 분리.
 - `ComfyUI`는 모델 추론 어댑터. `Ollama`는 대본 계획. `FFmpeg`는 인코딩/결합. GPU 소비 단계는 **하나씩** 진행.
 
+## 적응형 프리비즈 정책 (2026-11-28 추가)
+
+- **장면 제작 공통 표현은 샷별** `previs_policy`로 한다. `coarse`(최소 proxy)는 기본 **실험 가설**, `joint_lite`(필수 관절만), `geometry_rerender`(완성 메시 재렌더링 연구), `none`(대조군)을 별개로 기록.
+- 동작의 역동성이 아니라 **무엇을 정확히 맞춰야 하는지**로 선택: 추격에는 root/camera, 물체 접촉에는 손목/발목/접점, 얼굴 감정에는 실사 참조·프롬프트. 액션이라고 팔다리가 항상 불필요한 것도, 섬세한 표정이라고 full rig가 필요한 것도 아니다.
+- Blender의 정밀한 `camera/root/contact/joint target`과 영상 모델에 전달할 **보이는 RGB proxy 렌더**는 분리. 간단한 캡슐 도형으로 렌더하더라도 root 궤적·접촉 사건·ID·타임코드는 정밀하게 보존.
+- `LTXVAddGuide`는 **희소 이미지 앵커**. 이것만으로 영상의 연속 3D 전체 경로를 그대로 따를 수 있다고 가정하지 않는다. Layout-to-Render **전용 IC-LoRA 전체 영상**과 Motion Control **sparse-track IC-LoRA**는 별도 연구·설치·VRAM 검증 대상이다.
+- RGB 가이드에는 도형 ID/그리드/카메라 프러스텀/색상 라벨을 입히지 않는다. debug 보기와 AI 입력용 `clean_guide`를 분리하여 과거 P1의 도면 라벨 번짐을 예방한다.
+- 가이드 `profile`과 `channel`을 독립 설정하며 미설치 채널을 사용할 수 있는 것처럼 연결하지 않는다. 초기 파일럿은 **coarse로 충분한 단일 이동 장면**부터 검증하고, 접촉 장면에서만 `joint_lite` 후보를 시험.
+
+세부 규격: [ADAPTIVE_PREVIS.md](design/ADAPTIVE_PREVIS.md) · [P2_CONTRACTS](P2_CONTRACTS.md) · [실험 계획](experiments/P2_PREVIS_VALIDATION.md).
+
 ## 구현/계획 대조
 
 | 경계 | 기존 코드/근거 | P2 신규 작업 |

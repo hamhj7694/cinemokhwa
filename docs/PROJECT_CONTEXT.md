@@ -21,6 +21,18 @@
 | Blender 풀 프리비즈 | P1 `engine/layout3d.py`는 박스/원기둥/구를 Blender에서 **정지 PNG**로 렌더 | 시간축 3D 애니메이션, depth/seg/pose/bbox/camera 프레임별 출력(`engine/previs.py` 미존재) |
 | UI/오디오 | 요구사항·디자인 계획 존재 | 전체 P2 영상 제작과 웹/음성/립싱크 연결 미완성 |
 
+## 2026-11-28 신규 P2 기획 — Adaptive Previs (실험 전)
+
+첨부된 Seedance 2.5 사례와 BytePlus 공식 3D 클레이 가이드를 참고하여 **적응형 프리비즈** 방향을 정했다. **이것은 LTX-2.5 결과 검증이 아니다**.
+
+- 기본값 가설: 간단한 3D `coarse` proxy로 **카메라·root 동선·시간축**을 제어하고 관절과 세부 동작은 생성 모델/프롬프트에 맡긴다.
+- 접촉·손목/소품 위치·신체간 간섭이 중요하면 **필요한 관절만** `joint_lite`로 추가한다. 표정·시선·얼굴은 3D 복잡도를 높이는 대신 실사 참조·프롬프트를 우선 검증한다.
+- `geometry_rerender`는 **실사/정교한 표현이 필요한 장면의 기본값이 아닌**, 기존 3D 메시를 실제로 다시 칠하는 별도 연구 경로다.
+- Blender 정밀한 control tracks와 AI에 보이는 proxy 렌더, 실사 이미지 외형, LTX 가이드 주입 채널은 **분리된 네 축**. Seedance 2.5에서 유리한 coarse가 LTX에서 유리한지는 A/B 비교 전 확정 금지.
+- 기존 `engine/layout3d.py`의 정적 PNG와 `engine/animate.py`의 희소 프레임 앵커만 **코드에 존재**. 3~5초 전체 프리비즈 및 효과는 미구현/미검증.
+
+기준: [ADAPTIVE_PREVIS.md](design/ADAPTIVE_PREVIS.md) · [ADR-001](adr/ADR-001-adaptive-previs.md) · [P2_PREVIS_VALIDATION.md](experiments/P2_PREVIS_VALIDATION.md). 신규 실험/역할 H-021/022/023은 [로드맵](P2_ROADMAP.md).
+
 ## 고정 환경과 운영 경계
 - Windows 10 Pro, Intel i5-10500, 32GB RAM, RTX 3060 **12GB VRAM**.
 - GPU를 크게 쓰는 생성 단계는 동시에 실행하지 말고 직렬화. 테스트도 동일.

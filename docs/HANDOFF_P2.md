@@ -7,6 +7,14 @@
 
 ---
 
+## 2026-11-28 추가 인계 — 샷별 프리비즈 (기획, 미실행)
+
+- 신규 설계: [ADAPTIVE_PREVIS](design/ADAPTIVE_PREVIS.md), [ADR-001](adr/ADR-001-adaptive-previs.md), [실험 계획](experiments/P2_PREVIS_VALIDATION.md), [P2_ROADMAP](P2_ROADMAP.md) H-021/022/023.
+- Seedance 2.5 사례를 LTX-2.5 품질 증거로 사용하지 않는다. `coarse`는 실험 가설, `joint_lite`는 접촉 필요시 후보.
+- Blender 화면에 보여줄 proxy 도형과 **원본 카메라/root/joint/contact 트랙**을 구분해 구현한다.
+- 현재 `animate.py`의 `LTXVAddGuide`는 희소 이미지 앵커. 공식 Layout-to-Render/Motion Control IC-LoRA와 **동일하지 않다**. 설치된 LTX 모델과 LoRA 가용성은 실제 실험 전 점검.
+- **이번 변경에서 P2 실행/다운로드/시각 검증은 하지 않았다.** 2026-11-21 실측은 아래 그대로 보존.
+
 ## 1. 사용자 원문 (절대 훼손하지 말 것)
 
 | 구분 | 원문 |

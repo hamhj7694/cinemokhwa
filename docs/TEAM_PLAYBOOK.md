@@ -17,6 +17,18 @@
 - 코드 주 소유자가 둘 이상 지정될 경우 **티켓의 순서를 명시**하고 같은 파일에 동시 작업하지 않는다.
 - **GPU 한 대에서 각 에이전트별로 동시 렌더 금지**. 모델 설치/업데이트도 통합 담당 배정 시간에 직렬 실행.
 
+### 2026-11-28 Adaptive Previs 분업 규칙
+
+- **A0 제품/연출:** 샷별 '꼭 맞춰야 할 것'(카메라, root, 손·소품 접촉, 얼굴)을 정하고 `previs_policy` 최종 승인. **역동성만으로 coarse/fine 결정 금지**.
+- **A1 계약/통합:** `previs_policy`, `source_frame_idx`, `applied_frame_idx`, `guide_channel`, `clean_guide` 및 stage cache digest의 단일 소유자.
+- **A2 Blender:** **정밀한 보이지 않는 control tracks**와 **간단한 보이는 proxy**를 분리. 초기 coarse; joint_lite는 필요한 접촉 부위에만. 렌더에는 grid/label/frustum 표시 금지.
+- **A3 외형/이미지:** 얼굴·의상·소품·공간 참조의 소유자. Blender 원통 색/shape를 실제 외관 기준으로 오인하지 않도록 키프레임과 asset ID 검증.
+- **A4 영상/ComfyUI:** sparse RGB anchors와 추후 IC-LoRA 전체 영상·motion tracks를 **서로 다른 경로**로 구현. 같은 GPU에서 모델 추론 동시 실행 금지. 자산 미설치 채널은 blocked.
+- **A5 QA:** dynamic/contact/face/camera A/B 샷, 형태·채도 전이, camera/root/contact 충실도, 일관성/소요 시간, 수치와 사람 육안 판정 구분.
+- **A6 UI:** H6에서 **샷별 단순/관절/없음 프로필 수동 변경**과 채널 가용성 표시; 실험 미완료 기능 노출 금지.
+
+상세: [Adaptive Previs](design/ADAPTIVE_PREVIS.md) · [실험 계획](experiments/P2_PREVIS_VALIDATION.md) · 파트별 명세 [A2 Blender](specs/PREVIS_A2.md) / [A3 이미지](specs/APPEARANCE_A3.md) / [A4 LTX](specs/LTX_GUIDE_A4.md) / [A5 QA](specs/QUALITY_A5.md). 신규 H-021/022/023은 [P2_ROADMAP](P2_ROADMAP.md).
+
 ## 2. 에이전트 호출용 작업 티켓 템플릿
 ```text
 [Ticket] H-### / 역할 / 상태: ready|blocked

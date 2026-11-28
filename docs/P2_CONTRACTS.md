@@ -11,6 +11,41 @@
 - JSON에는 `schema_version` 필수; 경로는 임의 절대 경로가 아닌 **run 폴더 상대 경로**만 기록(외부 참조 원본은 별도 등록).
 - 인물/소품 사용 권한·출처·저장 정책, 모델 가중치 해시, 실제 GPU/성능 조건은 출력을 재현할 최소 메타로 기록.
 
+## 2026-11-28 샷별 Adaptive Previs 계약 초안 (H-002에서 확정)
+
+`scene_spec.shots[]`의 optional 정책 블록 `previs_policy` 및 렌더 결과 메타를 다음과 같이 정의 **제안**한다. 이는 **현행 코드 구현 아님**. 기존 필드를 제거하거나 P1 데이터를 깨뜨리지 않는다.
+
+```json
+{
+  "previs_policy": {
+    "profile": "coarse",
+    "profile_source": "manual",
+    "reason": "camera tracking and root path; no required hand contact",
+    "control_priority": {
+      "camera": "high",
+      "root_path": "high",
+      "subject_orientation": "medium",
+      "contact": "not_specified",
+      "joint_pose": "not_specified"
+    },
+    "guide_channel": "prompt_only",
+    "clean_guide": true,
+    "override_reason": null
+  }
+}
+```
+
+- `profile` 허용값: `none | coarse | joint_lite | geometry_rerender` (마지막은 실험/선행조건 필수).
+- `guide_channel` 허용값: `prompt_only | sparse_rgb_anchors | layout_video_ic_lora | motion_track_ic_lora`. **설계 후보는 설치/사용 가능 상태가 아님**.
+- `control_priority`: `high|medium|low|not_specified`. 필드 없는 신체 부위를 **정밀하게 추정·확정하지 않는다**.
+- `profile_source`: `manual|rule_suggested`. 추천 규칙만으로 성공을 주장하지 않으며 사람 override를 허용한다.
+- 프리비즈에서 `control_tracks`(정밀 좌표 원본)과 `rendered_proxy`(RGB/depth 등 모델 전달물)를 분리해야 한다. `previs/tracks.json`에 `profile`, `render_version`, `clean_guide`, RGB 생성 설정을 기록한다.
+- `frame_idx`는 0기반 24fps 정본. LTX 어댑터에서 앵커 인덱스를 변환하면 `source_frame_idx`, `applied_frame_idx`를 모두 저장하고 **변환 충돌/경계 초과를 실패**로 처리한다. 실제 노드의 유효 인덱스는 H-009 검사 전 확정하지 않는다.
+- 가이드 영상/프레임, 프롬프트, source image, guide strength, 모델/LoRA 파일 해시·형상 프로필 변경 시 해당 생성/검증 단계의 캐시를 무효화한다.
+- `geometry_rerender`/IC-LoRA는 모델 자산·VRAM·라이선스 점검 통과 후 선택 가능 상태로 전환한다. 불가하면 `blocked` 기록, `sparse_rgb_anchors` 자동 성공 대체로 간주하지 않는다.
+
+상세 [Adaptive Previs](design/ADAPTIVE_PREVIS.md) · [샷별 A/B 실험](experiments/P2_PREVIS_VALIDATION.md).
+
 ## 저장 구조 제안
 ```text
 C:/Users/mbc/mokhwa/work/<run_id>/   # run_id must start with p2-
@@ -44,7 +79,13 @@ P1 `work/<run_id>` 형식은 계속 보존. P2 `run_id` 자체가 `p2-` 접두�
     "prompt_visual": "man in a grey coat on a rainy street",
     "prompt_motion": "man walks forward, camera tracks slowly",
     "entity_ids": ["char-jun", "place-alley"],
-    "camera_intent": "medium tracking shot"
+    "camera_intent": "medium tracking shot",
+    "previs_policy": {
+      "profile": "coarse", "profile_source": "manual",
+      "guide_channel": "prompt_only", "clean_guide": true,
+      "control_priority": {"camera":"high","root_path":"high","contact":"not_specified","joint_pose":"not_specified"},
+      "reason": "root path + camera; no required limb contact", "override_reason": null
+    }
   }]
 }
 ```
@@ -76,13 +117,14 @@ P1 `work/<run_id>` 형식은 계속 보존. P2 `run_id` 자체가 `p2-` 접두�
     "camera": {"position_m": [0,1.6,0], "target_m": [0,1.3,6]},
     "objects": [{
       "entity_id": "char-jun", "instance_id": 1,
+      "root_position_m": [0, 0, 4], "root_rotation_euler_rad": [0, 0, 0],
       "bbox_xyxy_norm": [0.35,0.2,0.62,0.95],
       "visible": true
     }]
   }]
 }
 ```
-`bbox_xyxy_norm`은 0..1 기준 xyxy, 음수/범위 초과 거부. 실제 프레임·객체 가시성·프레임 수 연속 여부 확인. Depth/Segmentation/Pose는 단계별 optional→필수 승격 전 버전 갱신.
+`bbox_xyxy_norm`은 0..1 기준 xyxy, 음수/범위 초과 거부. root pose/카메라/접촉이 요구되는 샷에는 별도 `control_tracks`/`contact_events` 정본을 두며, 미지정 손가락/표정의 자세는 가짜 값으로 채우지 않는다. 실제 프레임·객체 가시성·프레임 수 연속 여부 확인. Depth/Segmentation/Pose는 단계별 optional→필수 승격 전 버전 갱신.
 
 ### `manifest.json` — orchestrator/캐시
 ```json
@@ -96,7 +138,7 @@ P1 `work/<run_id>` 형식은 계속 보존. P2 `run_id` 자체가 `p2-` 접두�
   }
 }
 ```
-유효한 `status`: pending/running/done/failed/needs_review. `done`은 파일 존재+해시+검증을 만족할 때만. 각 stage의 elapsed_seconds, 모델/seed/설정/오류 코드를 남김(필수 메타 정의는 H-002 계약 동결).
+유효한 **pipeline stage** `status`: pending/running/done/failed/needs_review/blocked. `blocked`는 모델·권한·계약 미충족으로 실행할 수 없음을 의미한다. A/B experiment의 `not_run/done_technical/accepted_visual`과는 다른 상태 체계이며 혼용 금지. `done`은 파일 존재+해시+검증을 만족할 때만. 각 stage의 elapsed_seconds, 모델/seed/설정/오류 코드를 남김(필수 메타 정의는 H-002 계약 동결).
 
 ### `evaluation.json` — verify → 승인자
 ```json
