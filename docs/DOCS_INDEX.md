@@ -21,6 +21,17 @@
 | **연구·아이디어** | `design/IDENTITY_FIRST_PIPELINE.md`, `design/3D_GUIDED_REALISM.md` | 선택 이유, 미검증 기술 가설 |
 | **UI 설계 참고** | `design/DESIGN-PLAN.md`, `prompts/` | UI 목표, 이전 에이전트 안내(현행 기준 아님) |
 
+## 2026-11-28 Adaptive Previs 업데이트
+
+| 상태 | 파일 | 역할 |
+|---|---|---|
+| **현행 P2 프리비즈 상세 설계(계획)** | [`design/ADAPTIVE_PREVIS.md`](design/ADAPTIVE_PREVIS.md) | 샷별 proxy 복잡도, 컨트롤 트랙·실사화 분리, LTX 전달 채널 |
+| **근거 결정(검증 전 가설)** | [`adr/ADR-001-adaptive-previs.md`](adr/ADR-001-adaptive-previs.md) | coarse 기본 가설과 경계 조건/되돌림 |
+| **P2 기술 실험 설계** | [`experiments/P2_PREVIS_VALIDATION.md`](experiments/P2_PREVIS_VALIDATION.md) | 달리기·접촉·표정·카메라 장면 비교, 모델/시간/사람 게이트 |
+| **전 Markdown 32개 검토 기록** | [`PLANNING_REVIEW_2026-11-28.md`](PLANNING_REVIEW_2026-11-28.md) | 기존 문서 분류·오류·보존/변경 근거 |
+
+**우선순위:** 제품 요구/아키텍처/계약 → Adaptive Previs 상세/ADR → 로드맵/테스트/팀 플레이북. 기존 2026-11-21 P1 기술 문서와 UI 프롬프트는 과거 기록으로 계속 보존한다. 신설 문서가 LTX 구현 완료를 뜻하지 않는다.
+
 ## 출처 간 충돌 시 처리
 1. 실행 여부는 **현재 코드와 재현 가능한 결과**가 우선한다.
 2. 앞으로 만들 기능·범위는 **P2_REQUIREMENTS → P2_ARCHITECTURE → P2_CONTRACTS → P2_ROADMAP** 순서로 결정한다. 계약 변경은 이를 함께 반영.
