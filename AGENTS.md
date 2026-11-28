@@ -26,7 +26,7 @@
 - **보이는 proxy 메시 정밀도 ≠ 제어 트랙 정밀도**. Blender root/camera/contact 데이터를 보존하되 RGB 전달용 도형은 최소화.
 - LTX `LTXVAddGuide`(이미지 앵커)와 Layout-to-Render/Motion Control IC-LoRA(전용 모델)는 **다른 채널**; 사용 가능한 코드·모델·GPU 실측이 없으면 동일하다고 취급하거나 `PASS`로 보고하지 않는다.
 - 샷별 `previs_policy`, `guide_channel`, 수동 선택 이유 및 clean/debug 가이드 분리는 [P2_CONTRACTS](docs/P2_CONTRACTS.md)와 [P2_PREVIS_VALIDATION](docs/experiments/P2_PREVIS_VALIDATION.md)을 따른다.
-- A2/A4/A5 코딩 착수 전 H-021 정책·H-002 계약 및 H-022 실험 게이트를 확인한다. 기획 승인으로 실험 성공을 주장하지 않는다.
+- A2/A3/A4/A5 코딩 착수 시 [파트별 기술 명세](docs/specs/PREVIS_A2.md) / [이미지](docs/specs/APPEARANCE_A3.md) / [영상](docs/specs/LTX_GUIDE_A4.md) / [검증](docs/specs/QUALITY_A5.md) 중 **자기 담당 문서**를 읽는다. H-021 정책·H-002 계약을 먼저 확인하고, H-022 실험은 H-011 통합 게이트에서 확인한다. 기획 승인으로 실험 성공을 주장하지 않는다.
 
 ## 작업 시작 규칙
 - 하나의 티켓만 수행한다. 티켓 ID, 담당 모듈, 선행조건, 읽을 파일, 산출물, 검증 명령, 금지 범위를 먼저 선언한다.
