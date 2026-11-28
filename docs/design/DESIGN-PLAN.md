@@ -8,6 +8,11 @@
 
 ---
 
+## 2026-11-28 P2 후속 UI 요구 (H6 / 아직 미구현)
+
+P2 영상 품질 검증 후에는 **샷별 프리비즈 정밀도**(`none`, `coarse`, `joint_lite`, 조건부 `geometry_rerender`)와 `guide_channel` 가용성을 볼 수 있는 설정/검토 화면이 필요하다. 자동 추천 이유 표시, 사람이 수정·비교, clean guide와 최종 실사 참조의 차이, 실험/설치 미완료 채널 비활성화를 포함.
+다만 H3 영상 검증 전부터 UI를 개발하지 않는다. [Adaptive Previs](ADAPTIVE_PREVIS.md) · [Roadmap](../P2_ROADMAP.md).
+
 ## 1. 디자인 목표
 
 | # | 목표 | 판정 |
